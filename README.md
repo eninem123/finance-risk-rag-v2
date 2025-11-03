@@ -320,6 +320,6 @@ ngrok http 8501
    python bert_finetune.py
    ```
   ## 2. 模型训练
-  ![DEMO](bak/4.PNG)
-  ![DEMO](bak/5.PNG)
-  ![DEMO](bak/6.PNG)
+  ![DEMO](4.PNG)
+  ![DEMO](5.PNG)
+  ![DEMO](6.PNG)
