@@ -7,7 +7,28 @@ import json
 from typing import List, Dict, Optional
 import jieba
 import numpy as np
+# utils.py (新增函数)
+import shutil
+import time
 
+
+def safe_delete_rag_db():
+    """安全删除 rag_db 目录，解决 WinError 32"""
+    if os.path.exists("rag_db"):
+        print("检测到旧向量库，尝试安全删除...")
+        for _ in range(5):
+            try:
+                shutil.rmtree("rag_db")
+                print("旧向量库 rag_db/ 已安全删除")
+                time.sleep(1)
+                return
+            except PermissionError:
+                print("文件被占用，等待 2 秒后重试...")
+                time.sleep(2)
+            except Exception as e:
+                print(f"删除失败: {e}")
+                time.sleep(1)
+        print("删除失败，请手动关闭占用 rag_db 的程序")
 # ====================== 路径管理工具 ======================
 def ensure_dirs(*dirs: str) -> None:
     """确保目录存在，不存在则创建"""
@@ -179,14 +200,17 @@ def normalize_risk_scores(scores: List[float]) -> List[float]:
 
 # ====================== 日志配置工具 ======================
 def setup_logger(name: str, log_file: str = "app.log", level: int = logging.INFO) -> logging.Logger:
-    """配置自定义日志器（按模块区分日志）"""
+    """配置自定义日志器（按模块区分日志），自动创建目录"""
+    import os
+    log_dir = os.path.dirname(log_file)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)  # 关键：自动创建目录
+
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
-    # 文件处理器
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
     file_handler.setFormatter(formatter)
     
-    # 控制台处理器
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     

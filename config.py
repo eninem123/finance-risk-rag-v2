@@ -1,5 +1,6 @@
 # D:\finance-risk-rag\config.py
 import os
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # 本地 BERT 模型路径（已放在 D:\finance-risk-rag\hfl\chinese-bert-wwm-ext）
@@ -25,3 +26,5 @@ LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.moonshot.cn/v1")
 TESSERACT_CMD = os.environ.get("TESSERACT_CMD", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
 
 # 其他配置可在这里添加
+
+

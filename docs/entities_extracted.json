@@ -1,4 +1,43 @@
 {
-  "fad7451a4eafd62d9e037f1edae02fd1.txt": [],
-  "H2_AN201806191157048326_1.txt": []
+  "extracted_at": "2025-11-06T14:44:23.569899",
+  "total_entities": 5,
+  "total_risk_score": 97,
+  "risk_level": "极高风险",
+  "entities": [
+    {
+      "type": "liquidity_risk",
+      "text": "流动性风险",
+      "risk_score": 25,
+      "confidence": 1.0,
+      "source": "rule"
+    },
+    {
+      "type": "credit_risk",
+      "text": "信用风险",
+      "risk_score": 30,
+      "confidence": 1.0,
+      "source": "rule"
+    },
+    {
+      "type": "market_risk",
+      "text": "市场风险",
+      "risk_score": 15,
+      "confidence": 1.0,
+      "source": "rule"
+    },
+    {
+      "type": "market_risk",
+      "text": "汇率风险",
+      "risk_score": 15,
+      "confidence": 1.0,
+      "source": "rule"
+    },
+    {
+      "type": "related_transaction",
+      "text": "关联交易",
+      "risk_score": 12,
+      "confidence": 1.0,
+      "source": "rule"
+    }
+  ]
 }

@@ -29,7 +29,7 @@ class Config:
     ]
     label2id = {label: i for i, label in enumerate(label_list)}
     id2label = {i: label for i, label in enumerate(label_list)}
-    # 模型与训练配置
+    # 模型与训练配置  加载中文 BERT 分类模型
     model_name = "hfl/chinese-bert-wwm-ext"
     max_seq_len = 512
     batch_size = 4  # CPU环境建议4，避免内存不足

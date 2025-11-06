@@ -1,0 +1,4 @@
+2025-11-06 13:18:31,876 - extract_entities - INFO - === 开始实体提取 ===
+2025-11-06 13:18:33,149 - extract_entities - INFO - 文本总长度: 978772 字符
+2025-11-06 14:44:23,568 - extract_entities - INFO - 规则实体: 15，BERT 实体: 0，融合后: 5
+2025-11-06 14:44:23,951 - extract_entities - INFO - RAG 向量库构建完成，共 5 条记录
