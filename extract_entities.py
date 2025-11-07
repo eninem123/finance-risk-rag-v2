@@ -199,14 +199,19 @@ if __name__ == "__main__":
     if model:
         print("正在分块运行 BERT NER...")
         chunks = chunk_text(full_text, chunk_size=400, overlap=50)
+        bert_entities = []
         for i, chunk in enumerate(chunks):
             print(f"  处理分块 {i+1}/{len(chunks)}")
             try:
+                # 关键：接收返回的结构化实体
                 ents = extract_entities_from_text(chunk, model, tokenizer, device, f"chunk_{i}")
                 bert_entities.extend(ents)
-                time.sleep(0.3)
+                print(f"    → 本块提取 {len(ents)} 个实体")
+                time.sleep(0.1)
             except Exception as e:
                 logger.warning(f"分块 {i} BERT 失败: {e}")
+    else:
+    bert_entities = []
 
     # 规则提取（全局）
     print("正在运行规则提取...")

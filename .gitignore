@@ -4,3 +4,6 @@ hfl
 bert_finetuned_model
 bak
 bert_ner_model
+classify_model
+paraphrase-multilingual-MiniLM-L12-v2
+bert-base-chinese

@@ -201,7 +201,7 @@ def normalize_risk_scores(scores: List[float]) -> List[float]:
 # ====================== 日志配置工具 ======================
 def setup_logger(name: str, log_file: str = "app.log", level: int = logging.INFO) -> logging.Logger:
     """配置自定义日志器（按模块区分日志），自动创建目录"""
-    import os
+    
     log_dir = os.path.dirname(log_file)
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)  # 关键：自动创建目录

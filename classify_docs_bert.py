@@ -1,79 +1,68 @@
+# classify_docs_bert.py - 一键运行，支持原始/微调模型切换
 import os
 import torch
-from transformers import BertTokenizer, BertForSequenceClassification
-from sentence_transformers import SentenceTransformer
-import numpy as np
+import json
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-from transformers import AutoTokenizer, AutoModel
+# ===================== 配置：自由切换模型 =====================
+USE_FINETUNED = True  # ← 改为 False 使用原始 hfl/chinese-bert-wwm-ext
 
-MODEL_PATH = os.path.join("D:\\finance-risk-rag", "hfl", "chinese-bert-wwm-ext")
+FINETUNED_PATH = "./classify_model/best"
+ORIGINAL_PATH = "hfl/chinese-bert-wwm-ext"
+MODEL_PATH = FINETUNED_PATH if USE_FINETUNED else ORIGINAL_PATH
+
+# 标签映射（与微调一致）
+label_map = {0: "公司研究报告", 1: "行业周报", 2: "上市合规手册", 3: "合并财务报表"}
+
+# ===================== 加载模型 =====================
+print(f"正在加载模型：{'【微调模型】' if USE_FINETUNED else '【原始模型】'} {MODEL_PATH}")
+print(f"设备：{'GPU' if torch.cuda.is_available() else 'CPU'}")
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-model = AutoModel.from_pretrained(MODEL_PATH)
+model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)
+model.eval()
+print("模型加载成功！\n")
 
-# 预定义文档类型（银行风控场景常用）
-DOC_TYPES = [
-    "年度财务报告", "季度财务报告", "风险评估报告", 
-    "信贷审批报告", "贷后检查报告", "监管合规报告", "其他"
-]
+# ===================== 分类函数 =====================
+def classify(text):
+    inputs = tokenizer(text[:512], return_tensors="pt", truncation=True, padding=True).to(device)
+    with torch.no_grad():
+        outputs = model(**inputs)
+    probs = torch.nn.functional.softmax(outputs.logits, dim=-1)[0]
+    pred_id = probs.argmax().item()
+    return {
+        "type": label_map[pred_id],
+        "confidence": round(float(probs.max().item()), 4),
+        "all_scores": {label_map[i]: round(float(p), 4) for i, p in enumerate(probs)}
+    }
 
-class BERTClassifier:
-    def __init__(self):
-        # 加载轻量级BERT模型（平衡速度和精度）
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
-        self.model = BertForSequenceClassification.from_pretrained(
-            'bert-base-chinese',
-            num_labels=len(DOC_TYPES)
-        )
-        # 加载句子嵌入模型（用于文本截断处理）
-        self.sentence_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model.to(self.device)
-        self.model.eval()  # 推理模式
+# ===================== 自动读取 docs/ 下的所有 PDF 文本 =====================
+DOCS_DIR = "docs"
+results = []
 
-    def _truncate_text(self, text, max_tokens=512):
-        """截断文本到BERT最大输入长度（避免显存爆炸）"""
-        tokens = self.tokenizer.tokenize(text)
-        if len(tokens) <= max_tokens:
-            return text
-        # 取最前面和最后面的内容（保留关键信息）
-        truncated_tokens = tokens[:300] + tokens[-212:]
-        return self.tokenizer.convert_tokens_to_string(truncated_tokens)
+if os.path.exists(DOCS_DIR):
+    for file in os.listdir(DOCS_DIR):
+        if file.endswith(".txt"):
+            path = os.path.join(DOCS_DIR, file)
+            with open(path, "r", encoding="utf-8") as f:
+                text = f.read()
+            result = classify(text)
+            result["filename"] = file
+            results.append(result)
+            print(f"【{file}】 → {result['type']} | 置信度：{result['confidence']}")
+else:
+    print(f"目录 {DOCS_DIR} 不存在，请检查！")
 
-    def classify_document(self, text):
-        """
-        分类文档类型
-        :param text: 文档文本内容
-        :return: 分类结果（类型+置信度）
-        """
-        if not text.strip():
-            return {"type": "其他", "confidence": 1.0}
-        
-        # 预处理文本
-        truncated_text = self._truncate_text(text)
-        inputs = self.tokenizer(
-            truncated_text,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=512
-        ).to(self.device)
+# ===================== 保存结果 =====================
+output = {
+    "model_used": MODEL_PATH,
+    "total_documents": len(results),
+    "classification_results": results
+}
 
-        # 模型推理
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            logits = outputs.logits
-            probabilities = torch.softmax(logits, dim=1).cpu().numpy()[0]
+with open("classification_report.json", "w", encoding="utf-8") as f:
+    json.dump(output, f, ensure_ascii=False, indent=2)
 
-        # 解析结果
-        max_idx = np.argmax(probabilities)
-        return {
-            "type": DOC_TYPES[max_idx],
-            "confidence": float(probabilities[max_idx])
-        }
-
-if __name__ == "__main__":
-    # 测试代码
-    classifier = BERTClassifier()
-    sample_text = "本报告旨在评估某企业2024年度的信贷风险，包括其偿债能力、现金流状况..."
-    print(classifier.classify_document(sample_text))
+print("\n分类完成！详细报告已保存至 classification_report.json")
