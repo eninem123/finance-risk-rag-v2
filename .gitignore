@@ -1,0 +1,100 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+rag_env/
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Model files (large)
+hfl/
+bert_finetuned_model/
+bert_ner_model/
+classify_model/
+paraphrase-multilingual-MiniLM-L12-v2/
+bert-base-chinese/
+*.bin
+*.pt
+*.pth
+*.onnx
+
+# OCR
+tesseract-ocr-w64-setup-*/
+
+# Data and cache
+cache/
+logs/
+rag_db/
+*.db
+*.sqlite
+
+# Output files
+docs/all_extracted.txt
+docs/entities_extracted.json
+docs/classification.json
+*.log
+
+# Backup
+bak/
+*.bak
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.pid
+
+# Package files
+*.zip
+*.tar.gz
+*.rar
