@@ -1,0 +1,50 @@
+{
+  "model_used": "./classify_model/best",
+  "total_documents": 4,
+  "classification_results": [
+    {
+      "type": "上市合规手册",
+      "confidence": 0.5281,
+      "all_scores": {
+        "公司研究报告": 0.1167,
+        "行业周报": 0.171,
+        "上市合规手册": 0.5281,
+        "合并财务报表": 0.1843
+      },
+      "filename": "fad7451a4eafd62d9e037f1edae02fd1.txt"
+    },
+    {
+      "type": "合并财务报表",
+      "confidence": 0.492,
+      "all_scores": {
+        "公司研究报告": 0.1884,
+        "行业周报": 0.0845,
+        "上市合规手册": 0.2351,
+        "合并财务报表": 0.492
+      },
+      "filename": "H2_AN201806191157048326_1.txt"
+    },
+    {
+      "type": "行业周报",
+      "confidence": 0.4382,
+      "all_scores": {
+        "公司研究报告": 0.1689,
+        "行业周报": 0.4382,
+        "上市合规手册": 0.3003,
+        "合并财务报表": 0.0927
+      },
+      "filename": "wKh2AmE3cVKAcunKABEmGgN5rBQ699.txt"
+    },
+    {
+      "type": "合并财务报表",
+      "confidence": 0.3572,
+      "all_scores": {
+        "公司研究报告": 0.1969,
+        "行业周报": 0.1434,
+        "上市合规手册": 0.3025,
+        "合并财务报表": 0.3572
+      },
+      "filename": "国信(香港)：伟易达(303 HK) 首发报告.txt"
+    }
+  ]
+}
