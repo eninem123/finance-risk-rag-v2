@@ -16,6 +16,7 @@ Finance-Risk-RAG 实体提取模块
 """
 
 import json
+import logging
 import os
 import re
 import time

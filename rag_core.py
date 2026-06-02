@@ -26,12 +26,11 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Union
 import chromadb
 from chromadb.utils import embedding_functions as ef
 
-from config import CHROMA_DB_DIR, LLM_API_KEY, LLM_BASE_URL
-from utils import clean_text, ensure_dirs, split_text_by_sentence
+from config import get_config
+from utils import clean_text, ensure_dirs, split_text_by_sentence, setup_logger
 
 # 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = setup_logger("rag_core", "logs/rag_core.log")
 
 
 # ==================== 数据类定义 ====================
@@ -177,7 +176,7 @@ class LLMClientWrapper:
         self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        model_name: str = DEFAULT_MODEL
+        model_name: Optional[str] = None
     ) -> None:
         """
         初始化LLM客户端
@@ -190,9 +189,10 @@ class LLMClientWrapper:
         Raises:
             LLMError: 客户端初始化失败
         """
-        self._api_key = api_key or LLM_API_KEY
-        self._base_url = base_url or LLM_BASE_URL
-        self._model_name = model_name
+        config = get_config()
+        self._api_key = api_key or config.llm_api_key
+        self._base_url = base_url or config.llm_base_url
+        self._model_name = model_name or config.llm_model_name
         self._client: Optional[Any] = None
         
         if not self._api_key:
@@ -218,37 +218,29 @@ class LLMClientWrapper:
         """检查客户端是否可用"""
         return self._client is not None
     
-    def ask(
+    def call(
         self,
-        query: str,
-        context: str,
+        messages: List[Dict[str, str]],
         temperature: float = DEFAULT_TEMPERATURE,
         max_tokens: int = DEFAULT_MAX_TOKENS
     ) -> str:
         """
-        向LLM提问
+        通用的LLM调用方法
         
         Args:
-            query: 用户问题
-            context: 上下文内容
+            messages: 消息列表
             temperature: 温度参数
             max_tokens: 最大token数
             
         Returns:
-            LLM回答
+            LLM回答内容
             
         Raises:
             LLMError: LLM调用失败
         """
         if not self.is_available:
             raise LLMError("LLM客户端未初始化，请设置API密钥")
-        
-        system_prompt = "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。"
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}"}
-        ]
-        
+
         try:
             response = self._client.chat.completions.create(
                 model=self._model_name,
@@ -260,6 +252,32 @@ class LLMClientWrapper:
         except Exception as e:
             logger.error(f"LLM调用失败: {e}")
             raise LLMError(f"LLM调用失败: {e}") from e
+
+    def ask(
+        self,
+        query: str,
+        context: str,
+        temperature: float = DEFAULT_TEMPERATURE,
+        max_tokens: int = DEFAULT_MAX_TOKENS
+    ) -> str:
+        """
+        向LLM提问（专用于RAG问答）
+
+        Args:
+            query: 用户问题
+            context: 上下文内容
+            temperature: 温度参数
+            max_tokens: 最大token数
+
+        Returns:
+            LLM回答
+        """
+        system_prompt = "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。"
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}"}
+        ]
+        return self.call(messages, temperature, max_tokens)
 
 
 # ==================== 文本分块器 ====================
@@ -324,7 +342,7 @@ class RAGDatabase:
     
     def __init__(
         self,
-        db_path: str = CHROMA_DB_DIR,
+        db_path: Optional[str] = None,
         embedding_fn: Optional[Callable[[List[str]], List[List[float]]]] = None
     ) -> None:
         """
@@ -334,9 +352,9 @@ class RAGDatabase:
             db_path: 数据库路径
             embedding_fn: 嵌入函数
         """
-        ensure_dirs(db_path)
-        
-        self._db_path = db_path
+        config = get_config()
+        self._db_path = db_path or str(config.chroma_db_dir)
+        ensure_dirs(self._db_path)
         self._embedding_fn = embedding_fn or EmbeddingModelFactory.create()
         self._client: Optional[chromadb.Client] = None
         self._collection: Optional[chromadb.Collection] = None
@@ -462,8 +480,8 @@ class RAGEngine:
     
     def __init__(
         self,
-        docs_dir: str = "docs",
-        db_path: str = CHROMA_DB_DIR,
+        docs_dir: Optional[str] = None,
+        db_path: Optional[str] = None,
         chunk_config: Optional[ChunkConfig] = None
     ) -> None:
         """
@@ -474,7 +492,8 @@ class RAGEngine:
             db_path: 数据库路径
             chunk_config: 分块配置
         """
-        self._docs_dir = Path(docs_dir)
+        config = get_config()
+        self._docs_dir = Path(docs_dir) if docs_dir else config.docs_dir
         self._chunker = TextChunker(chunk_config)
         self._llm_client = LLMClientWrapper()
         self._database = RAGDatabase(db_path)
