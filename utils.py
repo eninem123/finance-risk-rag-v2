@@ -16,13 +16,16 @@ Finance-Risk-RAG 工具模块
 import hashlib
 import json
 import logging
+import os
 import re
 import shutil
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
 import jieba
+import numpy as np
 
 # 类型别名
 PathLike = Union[str, Path]
@@ -30,21 +33,22 @@ PathLike = Union[str, Path]
 
 # ==================== 异常定义 ====================
 
-
 class UtilsError(Exception):
     """工具模块基础异常"""
+    pass
 
 
 class FileOperationError(UtilsError):
     """文件操作异常"""
+    pass
 
 
 class TextProcessingError(UtilsError):
     """文本处理异常"""
+    pass
 
 
 # ==================== 路径管理工具 ====================
-
 
 def ensure_dirs(*dirs: PathLike) -> None:
     """
@@ -87,7 +91,9 @@ def normalize_path(relative_path: PathLike) -> Path:
 
 
 def safe_delete_directory(
-    dir_path: PathLike, max_retries: int = 5, retry_delay: float = 2.0
+    dir_path: PathLike,
+    max_retries: int = 5,
+    retry_delay: float = 2.0
 ) -> bool:
     """
     安全删除目录（解决Windows文件占用问题）
@@ -155,7 +161,6 @@ def get_file_hash(file_path: PathLike, algorithm: str = "md5") -> str:
 
 # ==================== 文本处理工具 ====================
 
-
 def clean_text(text: str) -> str:
     """
     清洗文本
@@ -176,24 +181,28 @@ def clean_text(text: str) -> str:
         return ""
 
     # 去除连续空格和换行
-    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r'\s+', ' ', text).strip()
 
     # 去除特殊控制字符（保留中英文标点）
-    text = re.sub(r"[\x00-\x1F\x7F]", "", text)
+    text = re.sub(r'[\x00-\x1F\x7F]', '', text)
 
     # 处理中文句号（分两步避免破坏小数点）
     # 1. 数字间的中文句号 -> 英文句号 (如 3。5 -> 3.5)
-    text = re.sub(r"(?<=\d)。(?=\d)", ".", text)
+    text = re.sub(r'(?<=\d)。(?=\d)', '.', text)
     # 2. 非数字间的中文句号 -> 英文句号
-    text = re.sub(r"(?<!\d)。(?!\d)", ".", text)
+    text = re.sub(r'(?<!\d)。(?!\d)', '.', text)
 
     # 统一其他中文标点
-    text = text.replace("，", ",").replace("；", ";")
+    text = text.replace('，', ',').replace('；', ';')
 
     return text
 
 
-def split_text_by_sentence(text: str, max_len: int = 200, min_len: int = 20) -> List[str]:
+def split_text_by_sentence(
+    text: str,
+    max_len: int = 200,
+    min_len: int = 20
+) -> List[str]:
     """
     按句子拆分文本
 
@@ -214,7 +223,7 @@ def split_text_by_sentence(text: str, max_len: int = 200, min_len: int = 20) -> 
         return []
 
     # 句子分隔符正则（排除数字间的小数点）
-    sentence_seps = r"(?<!\d)([。！？；.!?;])(?![0-9.])"
+    sentence_seps = r'(?<!\d)([。！？；.!?;])(?![0-9.])'
 
     # 拆分句子
     parts = [p.strip() for p in re.split(sentence_seps, text) if p.strip()]
@@ -234,14 +243,8 @@ def split_text_by_sentence(text: str, max_len: int = 200, min_len: int = 20) -> 
 
     # 话题边界标志词
     new_topic_flags = {
-        "涉及",
-        "此外",
-        "同时",
-        "另外",
-        "其中",
-        "值得注意的是",
-        "需要说明的是",
-        "综上所述",
+        "涉及", "此外", "同时", "另外", "其中",
+        "值得注意的是", "需要说明的是", "综上所述"
     }
 
     for sent in sentences:
@@ -261,14 +264,18 @@ def split_text_by_sentence(text: str, max_len: int = 200, min_len: int = 20) -> 
     # 清理重复标点
     result = []
     for s in merged:
-        s = re.sub(r"([。！？；.!?;])+", r"\1", s.strip())
+        s = re.sub(r'([。！？；.!?;])+', r'\1', s.strip())
         if s and len(s) >= min_len:
             result.append(s)
 
     return result
 
 
-def extract_keywords(text: str, top_n: int = 10, min_word_len: int = 2) -> List[str]:
+def extract_keywords(
+    text: str,
+    top_n: int = 10,
+    min_word_len: int = 2
+) -> List[str]:
     """
     提取关键词
 
@@ -293,24 +300,17 @@ def extract_keywords(text: str, top_n: int = 10, min_word_len: int = 2) -> List[
 
     # 金融领域额外停用词
     finance_stopwords = {
-        "显示",
-        "涉及",
-        "去年",
-        "今年",
-        "报告",
-        "数据",
-        "情况",
-        "分析",
-        "指出",
-        "认为",
-        "表示",
-        "说明",
+        "显示", "涉及", "去年", "今年", "报告", "数据",
+        "情况", "分析", "指出", "认为", "表示", "说明"
     }
     stopwords.update(finance_stopwords)
 
     # 分词过滤
     words = jieba.cut(text)
-    filtered = [w for w in words if w.strip() and w not in stopwords and len(w) >= min_word_len]
+    filtered = [
+        w for w in words
+        if w.strip() and w not in stopwords and len(w) >= min_word_len
+    ]
 
     # 词频统计
     word_counts: Dict[str, int] = {}
@@ -323,7 +323,6 @@ def extract_keywords(text: str, top_n: int = 10, min_word_len: int = 2) -> List[
 
 
 # ==================== 数据缓存工具 ====================
-
 
 def load_json_file(file_path: PathLike, default: Any = None) -> Any:
     """
@@ -343,7 +342,7 @@ def load_json_file(file_path: PathLike, default: Any = None) -> Any:
         return default if default is not None else {}
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except json.JSONDecodeError as e:
         logging.error(f"JSON文件格式错误: {path}, {e}")
@@ -354,7 +353,10 @@ def load_json_file(file_path: PathLike, default: Any = None) -> Any:
 
 
 def save_json_file(
-    data: Any, file_path: PathLike, ensure_dir: bool = True, indent: int = 2
+    data: Any,
+    file_path: PathLike,
+    ensure_dir: bool = True,
+    indent: int = 2
 ) -> bool:
     """
     安全保存JSON文件
@@ -374,7 +376,7 @@ def save_json_file(
         if ensure_dir:
             path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=indent)
 
         return True
@@ -384,7 +386,6 @@ def save_json_file(
 
 
 # ==================== 停用词管理 ====================
-
 
 def load_stopwords() -> Set[str]:
     """
@@ -398,42 +399,15 @@ def load_stopwords() -> Set[str]:
     if not stopwords_path.exists():
         # 生成默认停用词表
         default_stopwords = {
-            "的",
-            "了",
-            "在",
-            "是",
-            "我",
-            "有",
-            "和",
-            "就",
-            "不",
-            "人",
-            "都",
-            "一",
-            "一个",
-            "上",
-            "也",
-            "很",
-            "到",
-            "说",
-            "要",
-            "去",
-            "你",
-            "会",
-            "着",
-            "没有",
-            "看",
-            "好",
-            "自己",
-            "这",
-            "那",
-            "个",
+            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人",
+            "都", "一", "一个", "上", "也", "很", "到", "说", "要", "去",
+            "你", "会", "着", "没有", "看", "好", "自己", "这", "那", "个"
         }
         save_json_file(list(default_stopwords), stopwords_path)
         return default_stopwords
 
     try:
-        with open(stopwords_path, "r", encoding="utf-8") as f:
+        with open(stopwords_path, 'r', encoding='utf-8') as f:
             return {line.strip() for line in f if line.strip()}
     except Exception as e:
         logging.error(f"加载停用词失败: {e}")
@@ -441,7 +415,6 @@ def load_stopwords() -> Set[str]:
 
 
 # ==================== 风险计算工具 ====================
-
 
 def calculate_risk_level(score: float) -> str:
     """
@@ -485,7 +458,10 @@ def normalize_risk_scores(scores: List[float]) -> List[float]:
     return [(s - min_score) / (max_score - min_score) * 100 for s in scores]
 
 
-def calculate_risk_trend(historical_scores: List[float], window_size: int = 3) -> Dict[str, Any]:
+def calculate_risk_trend(
+    historical_scores: List[float],
+    window_size: int = 3
+) -> Dict[str, Any]:
     """
     计算风险趋势
 
@@ -500,12 +476,13 @@ def calculate_risk_trend(historical_scores: List[float], window_size: int = 3) -
         return {
             "trend": "stable",
             "change_rate": 0.0,
-            "prediction": historical_scores[-1] if historical_scores else 0.0,
+            "prediction": historical_scores[-1] if historical_scores else 0.0
         }
 
     # 计算变化率
     changes = [
-        historical_scores[i] - historical_scores[i - 1] for i in range(1, len(historical_scores))
+        historical_scores[i] - historical_scores[i - 1]
+        for i in range(1, len(historical_scores))
     ]
 
     avg_change = sum(changes) / len(changes)
@@ -525,18 +502,17 @@ def calculate_risk_trend(historical_scores: List[float], window_size: int = 3) -
     return {
         "trend": trend,
         "change_rate": round(avg_change, 2),
-        "prediction": round(prediction, 2),
+        "prediction": round(prediction, 2)
     }
 
 
 # ==================== 日志配置工具 ====================
 
-
 def setup_logger(
     name: str,
     log_file: Optional[str] = None,
     level: int = logging.INFO,
-    format_str: Optional[str] = None,
+    format_str: Optional[str] = None
 ) -> logging.Logger:
     """
     配置自定义日志器
@@ -551,7 +527,7 @@ def setup_logger(
         配置好的日志器
     """
     if format_str is None:
-        format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format_str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
     formatter = logging.Formatter(format_str)
 
@@ -567,7 +543,7 @@ def setup_logger(
         if log_path.parent and not log_path.parent.exists():
             log_path.parent.mkdir(parents=True, exist_ok=True)
 
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
@@ -581,7 +557,6 @@ def setup_logger(
 
 # ==================== 向后兼容 ====================
 
-
 def safe_delete_rag_db() -> None:
     """
     安全删除rag_db目录（向后兼容函数）
@@ -589,3 +564,41 @@ def safe_delete_rag_db() -> None:
     已弃用，请使用 safe_delete_directory("rag_db")
     """
     safe_delete_directory("rag_db")
+
+
+# ==================== 测试代码 ====================
+
+if __name__ == "__main__":
+    # 文本处理测试
+    test_text = """
+    某银行2024年报告显示，流动性风险敞口达460亿元，较去年增加120亿元！
+
+    涉及关联交易金额3.5亿美元。此外，信用评级为AA。
+    """
+
+    print("=" * 50)
+    print("文本处理测试")
+    print("=" * 50)
+
+    print("\n清洗后文本:")
+    print(clean_text(test_text))
+
+    print("\n句子拆分:")
+    sentences = split_text_by_sentence(test_text)
+    for i, s in enumerate(sentences, 1):
+        print(f"  {i}. {s}")
+
+    print("\n关键词提取:")
+    keywords = extract_keywords(test_text)
+    print(f"  {keywords}")
+
+    print("\n风险等级计算:")
+    print(f"  75分 -> {calculate_risk_level(75)}")
+    print(f"  25分 -> {calculate_risk_level(25)}")
+    print(f"  95分 -> {calculate_risk_level(95)}")
+
+    print("\n风险趋势分析:")
+    scores = [30, 35, 42, 50, 58, 65]
+    trend = calculate_risk_trend(scores)
+    print(f"  历史分数: {scores}")
+    print(f"  趋势: {trend}")

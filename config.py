@@ -179,7 +179,7 @@ class Config:
             self.cache_dir,
             self.log_dir,
             self.docs_dir,
-            self.knowledge_base_dir,
+            self.knowledge_base_dir
         ]:
             dir_path.mkdir(parents=True, exist_ok=True)
 

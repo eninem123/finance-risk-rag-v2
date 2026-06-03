@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10']
+        python-version: ['3.9', '3.10']
 
     steps:
     - uses: actions/checkout@v3
@@ -20,58 +20,37 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-
-    - name: Cache pip packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+        cache: 'pip'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 black isort mypy
+        pip install flake8 black isort mypy pytest pytest-cov
         pip install -r requirements.txt
 
     - name: Lint with flake8
       run: |
-        # E203, E226, E704, W503 are ignored to avoid conflicts with black
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics --ignore=E203,E226,E704,W503
+        # E203, W503, and E704 are ignored to match Black's style
+        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics --ignore=E203,W503,E704
 
     - name: Format check with black
       run: |
-        black --check --line-length=100 .
+        black --check --line-length=100 src/
 
     - name: Import sort check with isort
       run: |
-        isort --check-only --profile black .
+        isort --check-only --profile black src/
 
     - name: Type check with mypy
       run: |
-        mypy --ignore-missing-imports .
+        export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+        mypy --ignore-missing-imports src/
 
-  code-quality:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-
-    - name: Install dependencies
+    - name: Run unit tests
       run: |
-        python -m pip install --upgrade pip
-        pip install black isort
-
-    - name: Check code formatting
-      run: |
-        black --check --line-length=100 .
-        isort --check-only --profile black .
+        export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+        pytest tests/
 
   security:
     runs-on: ubuntu-latest

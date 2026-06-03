@@ -178,20 +178,31 @@ LLM_MODEL_NAME=moonshot-v1-8k
 TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
 ```
 
-### 基本使用
+### 基本使用 (推荐方案)
+
+自 v2.1.0 起，项目提供了全新的模块化架构和统一的命令行入口：
 
 ```bash
-# 1. 将PDF文件放入 docs/ 目录
+# 1. 将 PDF 文件放入 docs/ 目录
 
-# 2. 提取文本
-python extract_text.py
+# 2. 批量处理 PDF 文档（OCR + 文本提取）
+python main.py process
 
 # 3. 提取风险实体
-python extract_entities.py
+python main.py extract --input docs/all_extracted.txt
 
-# 4. 构建RAG索引并查询
-python rag_core.py --build-db
-python rag_core.py --query "这家公司的流动性风险如何？"
+# 4. 问答查询（支持自动构建索引）
+python main.py query "这家公司的流动性风险如何？" --build
+```
+
+### 传统脚本使用 (向后兼容)
+
+原有的脚本仍保留在根目录，供需要单步调试或特定 BERT 微调场景使用：
+
+```bash
+python extract_text.py
+python extract_entities.py
+python risk_qa_cli.py --build
 ```
 
 ---

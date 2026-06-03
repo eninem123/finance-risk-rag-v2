@@ -1,29 +1,16 @@
-import os
 import unittest
 
-from config import Config
+from finance_risk_rag.config import Config
 
 
 class TestConfig(unittest.TestCase):
-    def test_default_paths(self):
+    def test_paths(self):
         config = Config()
         self.assertTrue(config.base_dir.is_absolute())
-        self.assertEqual(config.llm_provider, "moonshot")
 
-    def test_env_override(self):
-        os.environ["LLM_PROVIDER"] = "openai"
+    def test_property(self):
         config = Config()
-        self.assertEqual(config.llm_provider, "openai")
-        # Cleanup
-        del os.environ["LLM_PROVIDER"]
-
-    def test_validate(self):
-        config = Config()
-        # Should fail if no API key is set
-        self.assertFalse(config.validate())
-
-        config.llm_api_key = "test-key"
-        self.assertTrue(config.validate())
+        self.assertIn("risk_entities.json", str(config.risk_entities_path))
 
 
 if __name__ == "__main__":

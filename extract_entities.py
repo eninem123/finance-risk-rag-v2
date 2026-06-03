@@ -15,7 +15,8 @@ Finance-Risk-RAG 实体提取模块
 版本: 2.0.0
 """
 
-import logging
+import json
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -27,20 +28,21 @@ from openai import OpenAI
 
 from config import get_config
 from utils import (
-    calculate_risk_level,
     clean_text,
+    calculate_risk_level,
+    ensure_dirs,
     load_json_file,
     save_json_file,
     setup_logger,
+    safe_delete_directory,
 )
 
-# ==================== 数据类定义 ====================
 
+# ==================== 数据类定义 ====================
 
 @dataclass
 class Entity:
     """风险实体数据类"""
-
     type: str
     text: str
     risk_score: int
@@ -58,7 +60,7 @@ class Entity:
             "confidence": round(self.confidence, 4),
             "context": self.context,
             "source": self.source,
-            **self.metadata,
+            **self.metadata
         }
 
     @property
@@ -70,7 +72,6 @@ class Entity:
 @dataclass
 class ExtractionResult:
     """提取结果数据类"""
-
     entities: List[Entity]
     total_risk_score: int
     risk_level: str
@@ -85,42 +86,33 @@ class ExtractionResult:
             "total_risk_score": self.total_risk_score,
             "risk_level": self.risk_level,
             "entities": [e.to_dict() for e in self.entities],
-            **self.metadata,
+            **self.metadata
         }
 
 
 # ==================== 异常定义 ====================
 
-
 class ExtractionError(Exception):
     """实体提取异常"""
-
     pass
 
 
 class RuleLoadError(ExtractionError):
     """规则加载异常"""
-
     pass
 
 
 # ==================== 规则实体提取器 ====================
-
 
 class RuleBasedExtractor:
     """基于规则的实体提取器"""
 
     # 数值提取模式
     NUM_PATTERNS = {
-        "liquidity_risk": (
-            r"(现金储备|现金及现金等价物|cash.*reserve).*?(\d+[,\d]*\.?\d*)\s*"
-            r"(亿|亿元|百万|million|billion)"
-        ),
-        "credit_rating": r"(评级|rating).*?(AAA|AA\+|AA|AA-|A\+|A|A-|BBB\+|BBB|BBB-)",
-        "contingent_liability": r"(诉讼|pending litigation).*?(\d+[,\d]*\.?\d*)\s*(亿|万元|USD)",
-        "related_transaction": (
-            r"(关联交易金额|related party).*?(\d+[,\d]*\.?\d*)\s*(亿|万元|HKD|USD)"
-        ),
+        "liquidity_risk": r'(现金储备|现金及现金等价物|cash.*reserve).*?(\d+[,\d]*\.?\d*)\s*(亿|亿元|百万|million|billion)',
+        "credit_rating": r'(评级|rating).*?(AAA|AA\+|AA|AA-|A\+|A|A-|BBB\+|BBB|BBB-)',
+        "contingent_liability": r'(诉讼|pending litigation).*?(\d+[,\d]*\.?\d*)\s*(亿|万元|USD)',
+        "related_transaction": r'(关联交易金额|related party).*?(\d+[,\d]*\.?\d*)\s*(亿|万元|HKD|USD)'
     }
 
     def __init__(self, rules_path: Optional[Path] = None) -> None:
@@ -175,7 +167,7 @@ class RuleBasedExtractor:
             base_risk_score = config.get("risk_score", 10)
 
             for keyword in keywords:
-                pattern = rf"\b{re.escape(keyword)}\b"
+                pattern = rf'\b{re.escape(keyword)}\b'
 
                 for match in re.finditer(pattern, text, re.IGNORECASE):
                     start = match.start()
@@ -190,22 +182,19 @@ class RuleBasedExtractor:
                     context_end = min(len(text), start + len(keyword) + 80)
                     context = text[context_start:context_end].replace("\n", " ").strip()
 
-                    entities.append(
-                        Entity(
-                            type=entity_type,
-                            text=keyword,
-                            risk_score=base_risk_score,
-                            confidence=1.0,
-                            context=context,
-                            source="rule",
-                        )
-                    )
+                    entities.append(Entity(
+                        type=entity_type,
+                        text=keyword,
+                        risk_score=base_risk_score,
+                        confidence=1.0,
+                        context=context,
+                        source="rule"
+                    ))
 
         return entities
 
 
 # ==================== BERT 实体提取器 ====================
-
 
 class BERTExtractor:
     """基于BERT的实体提取器"""
@@ -217,9 +206,9 @@ class BERTExtractor:
         Args:
             model_path: 模型路径
         """
-        self._model: Optional[Any] = None
-        self._tokenizer: Optional[Any] = None
-        self._device: Optional[Any] = None
+        self._model = None
+        self._tokenizer = None
+        self._device = None
         self._logger = logging.getLogger(__name__)
 
         if model_path:
@@ -243,9 +232,8 @@ class BERTExtractor:
             self._tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self._model = AutoModelForTokenClassification.from_pretrained(str(model_path))
             self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            if self._model is not None:
-                self._model.to(self._device)
-                self._model.eval()
+            self._model.to(self._device)
+            self._model.eval()
 
             self._logger.info(f"BERT模型加载成功: {model_path}")
             return True
@@ -258,7 +246,12 @@ class BERTExtractor:
         """检查模型是否可用"""
         return self._model is not None
 
-    def extract(self, text: str, chunk_size: int = 400, overlap: int = 50) -> List[Entity]:
+    def extract(
+        self,
+        text: str,
+        chunk_size: int = 400,
+        overlap: int = 50
+    ) -> List[Entity]:
         """
         使用BERT提取实体
 
@@ -286,14 +279,19 @@ class BERTExtractor:
 
         return entities
 
-    def _chunk_text(self, text: str, chunk_size: int, overlap: int) -> List[str]:
+    def _chunk_text(
+        self,
+        text: str,
+        chunk_size: int,
+        overlap: int
+    ) -> List[str]:
         """文本分块"""
         words = text.split()
         chunks: List[str] = []
         i = 0
 
         while i < len(words):
-            chunk = " ".join(words[i : i + chunk_size])
+            chunk = " ".join(words[i:i + chunk_size])
             chunks.append(chunk)
             i += chunk_size - overlap
 
@@ -302,7 +300,11 @@ class BERTExtractor:
 
         return chunks
 
-    def _extract_from_chunk(self, chunk: str, chunk_id: str) -> List[Entity]:
+    def _extract_from_chunk(
+        self,
+        chunk: str,
+        chunk_id: str
+    ) -> List[Entity]:
         """从单个分块提取实体"""
         # 这里应该实现实际的BERT NER逻辑
         # 简化版本返回空列表
@@ -311,11 +313,14 @@ class BERTExtractor:
 
 # ==================== 实体融合器 ====================
 
-
 class EntityMerger:
     """实体融合器"""
 
-    def merge(self, rule_entities: List[Entity], bert_entities: List[Entity]) -> List[Entity]:
+    def merge(
+        self,
+        rule_entities: List[Entity],
+        bert_entities: List[Entity]
+    ) -> List[Entity]:
         """
         融合规则提取和BERT提取的实体
 
@@ -344,7 +349,6 @@ class EntityMerger:
 
 # ==================== RAG 问答系统 ====================
 
-
 class RAGQAService:
     """RAG问答服务"""
 
@@ -352,7 +356,7 @@ class RAGQAService:
         self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        model_name: str = "moonshot-v1-8k",
+        model_name: str = "moonshot-v1-8k"
     ) -> None:
         """
         初始化问答服务
@@ -364,12 +368,18 @@ class RAGQAService:
         """
         config = get_config()
         self._client = OpenAI(
-            api_key=api_key or config.llm_api_key, base_url=base_url or config.llm_base_url
+            api_key=api_key or config.llm_api_key,
+            base_url=base_url or config.llm_base_url
         )
         self._model_name = model_name
         self._logger = logging.getLogger(__name__)
 
-    def query(self, question: str, context_entities: List[Entity], max_tokens: int = 500) -> str:
+    def query(
+        self,
+        question: str,
+        context_entities: List[Entity],
+        max_tokens: int = 500
+    ) -> str:
         """
         执行问答
 
@@ -385,12 +395,10 @@ class RAGQAService:
             return "未发现相关风险实体。"
 
         # 构建上下文
-        context = "\n".join(
-            [
-                f"【{e.type}】{e.text} (风险分: {e.risk_score}, 置信: {e.confidence:.2f})"
-                for e in context_entities[:5]
-            ]
-        )
+        context = "\n".join([
+            f"【{e.type}】{e.text} (风险分: {e.risk_score}, 置信: {e.confidence:.2f})"
+            for e in context_entities[:5]
+        ])
 
         prompt = f"""
 你是一个银行风控专家。基于以下检索到的风险实体，简洁、专业地回答问题。
@@ -415,17 +423,15 @@ class RAGQAService:
                 model=self._model_name,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
-                temperature=0.2,
+                temperature=0.2
             )
-            content = response.choices[0].message.content
-            return content.strip() if content else ""
+            return response.choices[0].message.content.strip()
         except Exception as e:
             self._logger.error(f"问答失败: {e}")
             return f"问答失败：{e}"
 
 
 # ==================== 实体提取管道 ====================
-
 
 class EntityExtractionPipeline:
     """实体提取管道"""
@@ -508,10 +514,17 @@ class EntityExtractionPipeline:
             entities=final_entities,
             total_risk_score=total_risk,
             risk_level=risk_level,
-            metadata={"rule_entities": len(rule_entities), "bert_entities": len(bert_entities)},
+            metadata={
+                "rule_entities": len(rule_entities),
+                "bert_entities": len(bert_entities)
+            }
         )
 
-    def save_result(self, result: ExtractionResult, output_path: Path) -> None:
+    def save_result(
+        self,
+        result: ExtractionResult,
+        output_path: Path
+    ) -> None:
         """保存提取结果"""
         output_path.parent.mkdir(parents=True, exist_ok=True)
         save_json_file(result.to_dict(), output_path)
@@ -546,16 +559,13 @@ class EntityExtractionPipeline:
 
 # ==================== 命令行入口 ====================
 
-
 def main() -> None:
     """命令行入口函数"""
     import argparse
 
     parser = argparse.ArgumentParser(description="Finance-Risk-RAG 实体提取")
     parser.add_argument("--input", type=str, default="docs/all_extracted.txt", help="输入文本文件")
-    parser.add_argument(
-        "--output", type=str, default="docs/entities_extracted.json", help="输出JSON文件"
-    )
+    parser.add_argument("--output", type=str, default="docs/entities_extracted.json", help="输出JSON文件")
     parser.add_argument("--no-qa", action="store_true", help="禁用交互式问答")
 
     args = parser.parse_args()
@@ -571,7 +581,7 @@ def main() -> None:
     pipeline.save_result(result, Path(args.output))
 
     # 打印摘要
-    print("\n实体提取完成！")
+    print(f"\n实体提取完成！")
     print(f"  实体数: {len(result.entities)}")
     print(f"  总风险: {result.total_risk_score}/100 ({result.risk_level})")
     print(f"  保存: {args.output}")
