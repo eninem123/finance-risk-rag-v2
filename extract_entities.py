@@ -95,9 +95,13 @@ class ExtractionResult:
 class ExtractionError(Exception):
     """实体提取异常"""
 
+    pass
+
 
 class RuleLoadError(ExtractionError):
     """规则加载异常"""
+
+    pass
 
 
 # ==================== 规则实体提取器 ====================
@@ -114,7 +118,9 @@ class RuleBasedExtractor:
         ),
         "credit_rating": r"(评级|rating).*?(AAA|AA\+|AA|AA-|A\+|A|A-|BBB\+|BBB|BBB-)",
         "contingent_liability": r"(诉讼|pending litigation).*?(\d+[,\d]*\.?\d*)\s*(亿|万元|USD)",
-        "related_transaction": r"(关联交易金额|related party).*?(\d+[,\d]*\.?\d*)\s*(亿|万元|HKD|USD)",
+        "related_transaction": (
+            r"(关联交易金额|related party).*?(\d+[,\d]*\.?\d*)\s*(亿|万元|HKD|USD)"
+        ),
     }
 
     def __init__(self, rules_path: Optional[Path] = None) -> None:
@@ -211,9 +217,9 @@ class BERTExtractor:
         Args:
             model_path: 模型路径
         """
-        self._model = None
-        self._tokenizer = None
-        self._device = None
+        self._model: Optional[Any] = None
+        self._tokenizer: Optional[Any] = None
+        self._device: Optional[Any] = None
         self._logger = logging.getLogger(__name__)
 
         if model_path:
@@ -237,8 +243,9 @@ class BERTExtractor:
             self._tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self._model = AutoModelForTokenClassification.from_pretrained(str(model_path))
             self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self._model.to(self._device)
-            self._model.eval()
+            if self._model is not None:
+                self._model.to(self._device)
+                self._model.eval()
 
             self._logger.info(f"BERT模型加载成功: {model_path}")
             return True
@@ -410,7 +417,8 @@ class RAGQAService:
                 max_tokens=max_tokens,
                 temperature=0.2,
             )
-            return response.choices[0].message.content.strip()
+            content = response.choices[0].message.content
+            return content.strip() if content else ""
         except Exception as e:
             self._logger.error(f"问答失败: {e}")
             return f"问答失败：{e}"

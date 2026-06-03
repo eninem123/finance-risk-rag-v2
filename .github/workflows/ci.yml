@@ -37,8 +37,9 @@ jobs:
 
     - name: Lint with flake8
       run: |
+        # E203, E226, E704, W503 are ignored to avoid conflicts with black
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics --ignore=E203,E226,E704,W503
 
     - name: Format check with black
       run: |
@@ -76,7 +77,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-
 
     - name: Check for secrets
       uses: trufflesecurity/trufflehog@main

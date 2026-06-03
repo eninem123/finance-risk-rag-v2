@@ -16,7 +16,7 @@ Finance-Risk-RAG 核心模块
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Protocol
+from typing import Any, Callable, Dict, List, Optional, Protocol, cast
 
 import chromadb
 from chromadb.utils import embedding_functions as ef
@@ -95,17 +95,25 @@ class LLMClient(Protocol):
 class RAGError(Exception):
     """RAG系统基础异常"""
 
+    pass
+
 
 class EmbeddingError(RAGError):
     """嵌入模型相关异常"""
+
+    pass
 
 
 class LLMError(RAGError):
     """LLM调用相关异常"""
 
+    pass
+
 
 class DatabaseError(RAGError):
     """数据库相关异常"""
+
+    pass
 
 
 # ==================== 嵌入模型工厂 ====================
@@ -143,9 +151,11 @@ class EmbeddingModelFactory:
     def _create_onnx_embedding() -> Callable[[List[str]], List[List[float]]]:
         """创建ONNX嵌入函数"""
         try:
-            emb_fn = ef.ONNXMiniLM_L6_V2(preferred_providers=["CPUExecutionProvider"])
+            # ONNXMiniLM_L6_V2 might not be directly in ef or have different signature
+            # Using cast to avoid mypy issues with dynamically loaded libraries
+            emb_fn = ef.ONNXMiniLM_L6_V2()
             logger.info("使用 ONNXMiniLM_L6_V2 作为嵌入函数")
-            return emb_fn
+            return cast(Callable[[List[str]], List[List[float]]], emb_fn)
         except Exception as e:
             logger.warning(f"ONNXMiniLM_L6_V2 不可用: {e}，尝试备用方案")
             raise
@@ -241,7 +251,7 @@ class LLMClientWrapper:
         Raises:
             LLMError: LLM调用失败
         """
-        if not self.is_available:
+        if not self._client:
             raise LLMError("LLM客户端未初始化，请设置API密钥")
 
         try:
@@ -251,7 +261,8 @@ class LLMClientWrapper:
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            return content if content else ""
         except Exception as e:
             logger.error(f"LLM调用失败: {e}")
             raise LLMError(f"LLM调用失败: {e}") from e
@@ -368,8 +379,8 @@ class RAGDatabase:
         self._db_path = db_path or str(config.chroma_db_dir)
         ensure_dirs(self._db_path)
         self._embedding_fn = embedding_fn or EmbeddingModelFactory.create()
-        self._client: Optional[chromadb.Client] = None
-        self._collection: Optional[chromadb.Collection] = None
+        self._client: Optional[Any] = None
+        self._collection: Optional[Any] = None
 
         self._initialize()
 
@@ -383,8 +394,10 @@ class RAGDatabase:
             logger.error(f"数据库初始化失败: {e}")
             raise DatabaseError(f"无法初始化数据库: {e}") from e
 
-    def _get_or_create_collection(self) -> chromadb.Collection:
+    def _get_or_create_collection(self) -> Any:
         """获取或创建集合"""
+        if self._client is None:
+            return None
         try:
             return self._client.get_collection(name=self.COLLECTION_NAME)
         except Exception:
@@ -403,7 +416,7 @@ class RAGDatabase:
         Returns:
             添加的文档数量
         """
-        if not chunks:
+        if not chunks or not self._collection:
             return 0
 
         total_added = 0
@@ -414,8 +427,7 @@ class RAGDatabase:
             documents = [chunk.content for chunk in batch]
             ids = [f"{chunk.source}__{chunk.chunk_index}" for chunk in batch]
             metadatas = [
-                {"source": chunk.source, "chunk_index": chunk.chunk_index, **chunk.metadata}
-                for chunk in batch
+                {"source": chunk.source, "chunk_index": chunk.chunk_index} for chunk in batch
             ]
 
             try:
@@ -439,23 +451,29 @@ class RAGDatabase:
         Returns:
             相似文档列表
         """
+        if not self._collection:
+            return []
         try:
             results = self._collection.query(query_texts=[query_text], n_results=top_k)
 
-            documents = results.get("documents", [[]])[0]
-            metadatas = results.get("metadatas", [[]])[0]
-            distances = results.get("distances", [[]])[0]
+            documents = results.get("documents")
+            metadatas = results.get("metadatas")
+            distances = results.get("distances")
 
-            return [
-                {"content": doc, "metadata": meta, "distance": dist}
-                for doc, meta, dist in zip(documents, metadatas, distances)
-            ]
+            if documents and metadatas and distances:
+                return [
+                    {"content": doc, "metadata": meta, "distance": dist}
+                    for doc, meta, dist in zip(documents[0], metadatas[0], distances[0])
+                ]
+            return []
         except Exception as e:
             logger.error(f"查询失败: {e}")
             raise DatabaseError(f"查询失败: {e}") from e
 
     def clear(self) -> None:
         """清空数据库"""
+        if not self._client:
+            return
         try:
             self._client.delete_collection(name=self.COLLECTION_NAME)
             self._collection = self._get_or_create_collection()

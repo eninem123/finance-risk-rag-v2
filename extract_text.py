@@ -112,11 +112,11 @@ class DocumentProcessor:
         image = image.convert("L")  # 转灰度
         image = image.filter(ImageFilter.MedianFilter(size=3))
 
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(1.2)
+        brightness_enhancer = ImageEnhance.Brightness(image)
+        image = brightness_enhancer.enhance(1.2)
 
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(2.5)
+        contrast_enhancer = ImageEnhance.Contrast(image)
+        image = contrast_enhancer.enhance(2.5)
 
         image = image.filter(ImageFilter.SHARPEN)
         # 二值化
