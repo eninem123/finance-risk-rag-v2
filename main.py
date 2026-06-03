@@ -9,32 +9,39 @@ import argparse
 from pathlib import Path
 
 from src.finance_risk_rag.config import get_config
-from src.finance_risk_rag.processor import DocumentProcessor
-from src.finance_risk_rag.extractor import EntityExtractor
 from src.finance_risk_rag.engine import RAGEngine
+from src.finance_risk_rag.extractor import EntityExtractor
+from src.finance_risk_rag.processor import DocumentProcessor
 from src.finance_risk_rag.utils import setup_logger
+
 
 def main():
     parser = argparse.ArgumentParser(description="Finance-Risk-RAG: Professional Financial Risk AI")
     subparsers = parser.add_subparsers(dest="command", help="Subcommand to run")
 
     # Process Command
-    process_parser = subparsers.add_parser("process", help="Process PDF documents (OCR + Classification)")
+    process_parser = subparsers.add_parser(
+        "process", help="Process PDF documents (OCR + Classification)"
+    )
     process_parser.add_argument("--dir", type=str, help="Directory containing PDFs")
 
     # Extract Command
     extract_parser = subparsers.add_parser("extract", help="Extract risk entities from text files")
-    extract_parser.add_argument("--file", type=str, required=True, help="Text file to extract entities from")
+    extract_parser.add_argument(
+        "--file", type=str, required=True, help="Text file to extract entities from"
+    )
     extract_parser.add_argument("--output", type=str, help="Path to save extraction results (JSON)")
 
     # Query Command
     query_parser = subparsers.add_parser("query", help="Query the RAG system")
     query_parser.add_argument("question", type=str, help="The question to ask")
-    query_parser.add_argument("--index", action="store_true", help="Index documents before querying")
+    query_parser.add_argument(
+        "--index", action="store_true", help="Index documents before querying"
+    )
 
     args = parser.parse_args()
     config = get_config()
-    logger = setup_logger("CLI")
+    setup_logger("CLI")
 
     if args.command == "process":
         processor = DocumentProcessor(config)
@@ -79,6 +86,7 @@ def main():
 
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()

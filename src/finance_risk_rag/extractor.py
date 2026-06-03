@@ -6,12 +6,13 @@ Extracts risk entities from financial text using rules and AI.
 """
 
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List
 
 from .config import get_config
 from .utils import load_json, save_json, setup_logger
+
 
 @dataclass
 class RiskEntity:
@@ -19,6 +20,7 @@ class RiskEntity:
     text: str
     risk_score: int
     context: str
+
 
 class EntityExtractor:
     """Extracts risk entities from text."""
@@ -42,14 +44,13 @@ class EntityExtractor:
                 for match in pattern.finditer(text):
                     start = max(0, match.start() - 50)
                     end = min(len(text), match.end() + 50)
-                    context = text[start:end].replace('\n', ' ')
+                    context = text[start:end].replace("\n", " ")
 
-                    entities.append(RiskEntity(
-                        type=category,
-                        text=kw,
-                        risk_score=score,
-                        context=f"...{context}..."
-                    ))
+                    entities.append(
+                        RiskEntity(
+                            type=category, text=kw, risk_score=score, context=f"...{context}..."
+                        )
+                    )
 
         return entities
 
@@ -60,7 +61,9 @@ class EntityExtractor:
             "total_score": total_score,
             "entity_count": len(entities),
             "entities": [asdict(e) for e in entities],
-            "top_risks": [asdict(e) for e in sorted(entities, key=lambda x: x.risk_score, reverse=True)[:5]]
+            "top_risks": [
+                asdict(e) for e in sorted(entities, key=lambda x: x.risk_score, reverse=True)[:5]
+            ],
         }
 
     def save_results(self, summary: Dict[str, Any], output_path: Path):

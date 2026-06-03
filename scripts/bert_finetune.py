@@ -1,30 +1,44 @@
 # bert_finetune.py
-from utils import clean_text, setup_logger, ensure_dirs
-import torch
-import numpy as np
 import logging
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support
-from torch.utils.data import Dataset, DataLoader
-from transformers import (
-    BertTokenizerFast,
-    BertForTokenClassification,
-    get_linear_schedule_with_warmup  # 正确名称
-)
-from tqdm import tqdm
 import os
+
+import torch
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
+from transformers import get_linear_schedule_with_warmup  # 正确名称
+from transformers import (
+    BertForTokenClassification,
+    BertTokenizerFast,
+)
+from utils import clean_text, ensure_dirs, setup_logger
 
 # 初始化日志
 logger = setup_logger(name="bert_finetune", log_file="bert_train.log", level=logging.INFO)
+
 
 # ====================== 配置 =======================
 class Config:
     train_path = "dataset/train/ner_train.txt"
     dev_path = "dataset/dev/ner_dev.txt"
     label_list = [
-        "O", "B-DATE", "I-DATE", "B-PER", "I-PER",
-        "B-ORG", "I-ORG", "B-MONEY", "I-MONEY",
-        "B-RISK", "I-RISK", "B-SEC", "I-SEC",
-        "B-REG", "I-REG", "B-LAW", "I-LAW"
+        "O",
+        "B-DATE",
+        "I-DATE",
+        "B-PER",
+        "I-PER",
+        "B-ORG",
+        "I-ORG",
+        "B-MONEY",
+        "I-MONEY",
+        "B-RISK",
+        "I-RISK",
+        "B-SEC",
+        "I-SEC",
+        "B-REG",
+        "I-REG",
+        "B-LAW",
+        "I-LAW",
     ]
     label2id = {label: i for i, label in enumerate(label_list)}
     id2label = {i: label for i, label in enumerate(label_list)}
@@ -36,7 +50,9 @@ class Config:
     save_dir = "bert_ner_model"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 config = Config()
+
 
 # ====================== 数据集 =======================
 class NERDataset(Dataset):
@@ -90,7 +106,7 @@ class NERDataset(Dataset):
             max_length=config.max_seq_len,
             padding="max_length",
             truncation=True,
-            return_tensors="pt"
+            return_tensors="pt",
         )
         word_ids = encoding.word_ids(batch_index=0)
         aligned_labels = []
@@ -103,8 +119,9 @@ class NERDataset(Dataset):
         return {
             "input_ids": encoding["input_ids"].squeeze(0),
             "attention_mask": encoding["attention_mask"].squeeze(0),
-            "labels": torch.tensor(aligned_labels, dtype=torch.long)
+            "labels": torch.tensor(aligned_labels, dtype=torch.long),
         }
+
 
 # ====================== 模型 =======================
 def init_model_tokenizer():
@@ -113,10 +130,11 @@ def init_model_tokenizer():
         config.model_name,
         num_labels=len(config.label_list),
         id2label=config.id2label,
-        label2id=config.label2id
+        label2id=config.label2id,
     )
     model.to(config.device)
     return model, tokenizer
+
 
 def train_epoch(model, dataloader, optimizer, scheduler):
     model.train()
@@ -143,8 +161,11 @@ def train_epoch(model, dataloader, optimizer, scheduler):
             all_labels.extend(l[mask])
     avg_loss = total_loss / len(dataloader.dataset)
     accuracy = accuracy_score(all_labels, all_preds)
-    precision, recall, f1, _ = precision_recall_fscore_support(all_labels, all_preds, average="macro", zero_division=0)
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        all_labels, all_preds, average="macro", zero_division=0
+    )
     return avg_loss, accuracy, precision, recall, f1
+
 
 def eval_epoch(model, dataloader):
     model.eval()
@@ -168,8 +189,11 @@ def eval_epoch(model, dataloader):
                 all_labels.extend(l[mask])
     avg_loss = total_loss / len(dataloader.dataset)
     accuracy = accuracy_score(all_labels, all_preds)
-    precision, recall, f1, _ = precision_recall_fscore_support(all_labels, all_preds, average="macro", zero_division=0)
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        all_labels, all_preds, average="macro", zero_division=0
+    )
     return avg_loss, accuracy, precision, recall, f1
+
 
 # ====================== 主函数 =======================
 def main():
@@ -184,7 +208,9 @@ def main():
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, eps=1e-8)
     total_steps = len(train_loader) * config.epochs
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer, num_warmup_steps=0, num_training_steps=total_steps
+    )
 
     best_f1 = 0.0
     os.makedirs(config.save_dir, exist_ok=True)
@@ -192,7 +218,9 @@ def main():
 
     for epoch in range(config.epochs):
         print(f"\n===== Epoch {epoch+1}/{config.epochs} =====")
-        train_loss, train_acc, train_p, train_r, train_f1 = train_epoch(model, train_loader, optimizer, scheduler)
+        train_loss, train_acc, train_p, train_r, train_f1 = train_epoch(
+            model, train_loader, optimizer, scheduler
+        )
         dev_loss, dev_acc, dev_p, dev_r, dev_f1 = eval_epoch(model, dev_loader)
         print(f"训练集：损失={train_loss:.4f} | 准确率={train_acc:.4f} | F1={train_f1:.4f}")
         print(f"验证集：损失={dev_loss:.4f} | 准确率={dev_acc:.4f} | F1={dev_f1:.4f}")
@@ -203,6 +231,7 @@ def main():
             print(f"最佳模型已保存至：{os.path.join(config.save_dir, 'best_model')}")
 
     print(f"\n训练完成！最佳验证集F1：{best_f1:.4f}")
+
 
 if __name__ == "__main__":
     main()

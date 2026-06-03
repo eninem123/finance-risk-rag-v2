@@ -5,19 +5,19 @@ Finance-Risk-RAG Processor Module
 Handles document extraction, OCR, and classification.
 """
 
-import os
 import json
 import re
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional
+from typing import Any, Dict, Optional
 
 import pdfplumber
 import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
 
 from .config import get_config
-from .utils import setup_logger, get_file_hash, load_json, save_json
 from .engine import LLMClientWrapper
+from .utils import get_file_hash, load_json, save_json, setup_logger
+
 
 class DocumentProcessor:
     """Processes PDF documents using OCR and AI classification."""
@@ -32,10 +32,10 @@ class DocumentProcessor:
 
     def optimize_image(self, image: Image.Image) -> Image.Image:
         """Enhance image for better OCR results."""
-        image = image.convert('L')
+        image = image.convert("L")
         image = image.filter(ImageFilter.MedianFilter(size=3))
         image = ImageEnhance.Contrast(image).enhance(2.0)
-        image = image.point(lambda x: 0 if x < 140 else 255, '1')
+        image = image.point(lambda x: 0 if x < 140 else 255, "1")
         return image
 
     def extract_text(self, pdf_path: Path) -> str:
@@ -58,14 +58,18 @@ class DocumentProcessor:
 
     def classify_document(self, text: str) -> Dict[str, Any]:
         """Classify document type using LLM."""
-        prompt = f"Classify this document into one of: Audit, Industry, Company Research, Listing Manual, Financial Report, Other. Return JSON with 'type' and 'confidence'.\n\nContent sample: {text[:2000]}"
+        prompt = (
+            "Classify this document into one of: Audit, Industry, Company Research, "
+            "Listing Manual, Financial Report, Other. Return JSON with 'type' and "
+            f"'confidence'.\n\nContent sample: {text[:2000]}"
+        )
 
         messages = [{"role": "user", "content": prompt}]
         response = self.llm.call(messages)
 
         # Simple extraction of JSON from response
         try:
-            match = re.search(r'\{.*\}', response, re.DOTALL)
+            match = re.search(r"\{.*\}", response, re.DOTALL)
             if match:
                 return json.loads(match.group())
         except Exception:
@@ -100,7 +104,7 @@ class DocumentProcessor:
             log[pdf_file.name] = {
                 "hash": file_hash,
                 "version": self.config.ocr_version,
-                "classification": classification
+                "classification": classification,
             }
             results[pdf_file.name] = classification
 

@@ -1,5 +1,7 @@
 from pathlib import Path
+
 from src.finance_risk_rag.config import get_config
+
 
 def test_config_defaults():
     config = get_config()
@@ -7,6 +9,7 @@ def test_config_defaults():
     assert config.llm_model_name == "moonshot-v1-8k"
     assert isinstance(config.base_dir, Path)
     assert config.base_dir.exists()
+
 
 def test_config_paths():
     config = get_config()
