@@ -100,9 +100,9 @@ class RAGEngine:
             content = txt_file.read_text(encoding="utf-8")
             sentences = split_text_by_sentence(content)
 
-            ids = []
-            docs = []
-            metas = []
+            ids: List[str] = []
+            docs: List[str] = []
+            metas: List[Dict[str, Any]] = []
 
             for i, sent in enumerate(sentences):
                 ids.append(f"{txt_file.name}_{i}")
@@ -110,7 +110,7 @@ class RAGEngine:
                 metas.append({"source": txt_file.name, "index": i})
 
             if ids:
-                self.collection.add(ids=ids, documents=docs, metadatas=metas)
+                self.collection.add(ids=ids, documents=docs, metadatas=cast(Any, metas))
                 stats["files"] += 1
                 stats["chunks"] += len(ids)
 
@@ -132,4 +132,5 @@ class RAGEngine:
         ]
 
         answer = self.llm.call(messages)
-        return QueryResult(answer, metas[0] if metas else [])
+        sources = cast(List[Dict[str, Any]], metas[0]) if metas else []
+        return QueryResult(answer, sources)
