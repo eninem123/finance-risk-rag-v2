@@ -115,8 +115,8 @@ class DocumentProcessor:
         brightness_enhancer = ImageEnhance.Brightness(image)
         image = brightness_enhancer.enhance(1.2)
 
-        contrast_enhancer = ImageEnhance.Contrast(image)
-        image = contrast_enhancer.enhance(2.5)
+        c_enhancer = ImageEnhance.Contrast(image)
+        image = c_enhancer.enhance(2.5)
 
         image = image.filter(ImageFilter.SHARPEN)
         # 二值化

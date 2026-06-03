@@ -153,7 +153,8 @@ class EmbeddingModelFactory:
         try:
             # ONNXMiniLM_L6_V2 might not be directly in ef or have different signature
             # Using cast to avoid mypy issues with dynamically loaded libraries
-            emb_fn = ef.ONNXMiniLM_L6_V2()
+            onnx_ef: Any = ef
+            emb_fn = onnx_ef.ONNXMiniLM_L6_V2()
             logger.info("使用 ONNXMiniLM_L6_V2 作为嵌入函数")
             return cast(Callable[[List[str]], List[List[float]]], emb_fn)
         except Exception as e:
