@@ -9,21 +9,18 @@ Finance-Risk-RAG 文档处理模块
 版本: 2.0.0
 """
 
-import os
-import glob
 import json
-import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 import pdfplumber
 import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
 
 from config import get_config
-from utils import get_file_hash, setup_logger, ensure_dirs
 from rag_core import LLMClientWrapper
+from utils import ensure_dirs, get_file_hash, setup_logger
 
 # 配置日志
 logger = setup_logger("document_processor", "logs/extract_text.log")
@@ -43,7 +40,7 @@ class DocumentProcessor:
         self.llm_client = LLMClientWrapper(
             api_key=self.config.llm_api_key,
             base_url=self.config.llm_base_url,
-            model_name=self.config.llm_model_name
+            model_name=self.config.llm_model_name,
         )
 
         # 配置 Tesseract
@@ -86,7 +83,7 @@ class DocumentProcessor:
 }}
 """
         messages = [{"role": "user", "content": prompt}]
-        
+
         try:
             content = self.llm_client.call(messages, temperature=0.2)
             # 兼容模型可能输出的多余文字
@@ -112,7 +109,7 @@ class DocumentProcessor:
         Returns:
             处理后的图像
         """
-        image = image.convert('L')  # 转灰度
+        image = image.convert("L")  # 转灰度
         image = image.filter(ImageFilter.MedianFilter(size=3))
 
         enhancer = ImageEnhance.Brightness(image)
@@ -123,7 +120,7 @@ class DocumentProcessor:
 
         image = image.filter(ImageFilter.SHARPEN)
         # 二值化
-        image = image.point(lambda x: 0 if x < 140 else 255, '1')
+        image = image.point(lambda x: 0 if x < 140 else 255, "1")
         return image
 
     def extract_text_from_pdf(self, pdf_path: Path) -> Tuple[str, Dict[str, Any], int]:
@@ -150,9 +147,7 @@ class DocumentProcessor:
                         img = page.to_image(resolution=self.config.ocr_dpi).original
                         img = self.optimize_image_for_ocr(img)
                         ocr_text = pytesseract.image_to_string(
-                            img,
-                            lang=self.config.ocr_languages,
-                            config='--oem 1 --psm 3'
+                            img, lang=self.config.ocr_languages, config="--oem 1 --psm 3"
                         )
                         text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
                         ocr_pages += 1
@@ -164,17 +159,18 @@ class DocumentProcessor:
         # 抽取样本文本进行分类
         sample = text[:3000]
         classification = self.classify_document_with_ai(sample)
-        logger.info(f"   [分类] {pdf_path.name}: {classification.get('type')} (置信度: {classification.get('confidence', 0):.2f})")
+        conf = classification.get("confidence", 0)
+        logger.info(f"   [分类] {pdf_path.name}: {classification.get('type')} (置信度: {conf:.2f})")
 
         return text, classification, ocr_pages
 
     def batch_process(self, docs_dir: Optional[Path] = None) -> Dict[str, Any]:
         """
         批量处理目录下的文档
-        
+
         Args:
             docs_dir: 文档目录
-            
+
         Returns:
             批处理统计信息
         """
@@ -200,9 +196,11 @@ class DocumentProcessor:
 
             # 检查是否需要增量处理
             cached = log.get(filename, {})
-            if (cached.get("hash") == file_hash and
-                cached.get("ocr_version") == self.config.ocr_version and
-                txt_path.exists()):
+            if (
+                cached.get("hash") == file_hash
+                and cached.get("ocr_version") == self.config.ocr_version
+                and txt_path.exists()
+            ):
                 logger.info(f"跳过: {filename} (已处理，版本 {self.config.ocr_version})")
                 with open(txt_path, "r", encoding="utf-8") as f:
                     text = f.read()
@@ -226,13 +224,13 @@ class DocumentProcessor:
                         "ocr_version": self.config.ocr_version,
                         "processed_at": datetime.now().isoformat(),
                         "classification": classification,
-                        "ocr_pages": ocr_count
+                        "ocr_pages": ocr_count,
                     }
                 except Exception as e:
                     logger.error(f"处理 {filename} 时出错: {e}")
                     continue
 
-            all_text += text + "\n\n" + "="*60 + "\n\n"
+            all_text += text + "\n\n" + "=" * 60 + "\n\n"
             classifications[filename] = classification
 
         # 保存汇总结果
@@ -252,7 +250,7 @@ class DocumentProcessor:
             "processed": processed_count,
             "skipped": skipped_count,
             "total_ocr_pages": total_ocr_pages,
-            "ocr_version": self.config.ocr_version
+            "ocr_version": self.config.ocr_version,
         }
         logger.info(f"批量处理完成: {stats}")
         return stats
@@ -273,16 +271,16 @@ def main() -> None:
     processor = DocumentProcessor(config)
     stats = processor.batch_process(docs_dir)
 
-    print("\n" + "="*30)
+    print("\n" + "=" * 30)
     print("文档处理总结")
-    print("="*30)
+    print("=" * 30)
     print(f"总文件数: {stats['total_files']}")
     print(f"本次处理: {stats['processed']}")
     print(f"跳过处理: {stats['skipped']}")
     print(f"OCR 总页数: {stats['total_ocr_pages']}")
     print(f"OCR 版本: {stats['ocr_version']}")
     print(f"日志路径: {config.processing_log_path}")
-    print("="*30)
+    print("=" * 30)
 
 
 if __name__ == "__main__":

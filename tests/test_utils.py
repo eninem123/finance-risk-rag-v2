@@ -1,5 +1,7 @@
 import unittest
-from utils import clean_text, split_text_by_sentence, calculate_risk_level
+
+from utils import calculate_risk_level, clean_text, split_text_by_sentence
+
 
 class TestUtils(unittest.TestCase):
     def test_clean_text(self):
@@ -27,6 +29,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(calculate_risk_level(45), "中风险")
         self.assertEqual(calculate_risk_level(75), "高风险")
         self.assertEqual(calculate_risk_level(95), "极高风险")
+
 
 if __name__ == "__main__":
     unittest.main()

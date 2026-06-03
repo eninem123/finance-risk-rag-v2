@@ -1,6 +1,8 @@
-import unittest
 import os
+import unittest
+
 from config import Config
+
 
 class TestConfig(unittest.TestCase):
     def test_default_paths(self):
@@ -22,6 +24,7 @@ class TestConfig(unittest.TestCase):
 
         config.llm_api_key = "test-key"
         self.assertTrue(config.validate())
+
 
 if __name__ == "__main__":
     unittest.main()
