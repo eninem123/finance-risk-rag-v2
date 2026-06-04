@@ -52,3 +52,11 @@ target-version = ['py38']
 [tool.isort]
 profile = "black"
 line_length = 100
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_configs = true
+explicit_package_bases = true
+mypy_path = "src"
+exclude = ["scripts", "docs", "rag_env"]
