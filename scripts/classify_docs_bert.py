@@ -1,8 +1,9 @@
 # classify_docs_bert.py - 一键运行，支持原始/微调模型切换
-import os
-import torch
 import json
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import os
+
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 # ===================== 配置：自由切换模型 =====================
 USE_FINETUNED = True  # ← 改为 False 使用原始 hfl/chinese-bert-wwm-ext
@@ -25,6 +26,7 @@ model.to(device)
 model.eval()
 print("模型加载成功！\n")
 
+
 # ===================== 分类函数 =====================
 def classify(text):
     inputs = tokenizer(text[:512], return_tensors="pt", truncation=True, padding=True).to(device)
@@ -35,8 +37,9 @@ def classify(text):
     return {
         "type": label_map[pred_id],
         "confidence": round(float(probs.max().item()), 4),
-        "all_scores": {label_map[i]: round(float(p), 4) for i, p in enumerate(probs)}
+        "all_scores": {label_map[i]: round(float(p), 4) for i, p in enumerate(probs)},
     }
+
 
 # ===================== 自动读取 docs/ 下的所有 PDF 文本 =====================
 DOCS_DIR = "docs"
@@ -59,7 +62,7 @@ else:
 output = {
     "model_used": MODEL_PATH,
     "total_documents": len(results),
-    "classification_results": results
+    "classification_results": results,
 }
 
 with open("classification_report.json", "w", encoding="utf-8") as f:

@@ -6,7 +6,6 @@ Finance-Risk-RAG LLM 客户端
 """
 
 import logging
-import time
 from typing import Any, Dict, List, Optional, Protocol
 
 from .config import LLM_API_KEY, LLM_BASE_URL
@@ -16,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 class LLMClient(Protocol):
     """LLM客户端协议"""
-    def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        ...
+
+    def chat(self, messages: List[Dict[str, str]], **kwargs) -> str: ...
 
 
 class LLMClientWrapper:
@@ -31,7 +30,7 @@ class LLMClientWrapper:
         self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        model_name: str = DEFAULT_MODEL
+        model_name: str = DEFAULT_MODEL,
     ) -> None:
         """
         初始化LLM客户端
@@ -61,6 +60,7 @@ class LLMClientWrapper:
         """初始化OpenAI兼容客户端"""
         try:
             from openai import OpenAI
+
             self._client = OpenAI(api_key=self._api_key, base_url=self._base_url)
             logger.info(f"LLM客户端初始化成功，模型: {self._model_name}")
         except Exception as e:
@@ -77,7 +77,7 @@ class LLMClientWrapper:
         messages: List[Dict[str, str]],
         temperature: float = DEFAULT_TEMPERATURE,
         max_tokens: int = DEFAULT_MAX_TOKENS,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
         通用 LLM 调用
@@ -99,7 +99,7 @@ class LLMClientWrapper:
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                **kwargs
+                **kwargs,
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -111,7 +111,7 @@ class LLMClientWrapper:
         query: str,
         context: str,
         temperature: float = DEFAULT_TEMPERATURE,
-        max_tokens: int = DEFAULT_MAX_TOKENS
+        max_tokens: int = DEFAULT_MAX_TOKENS,
     ) -> str:
         """
         参考上下文向LLM提问
@@ -119,6 +119,9 @@ class LLMClientWrapper:
         system_prompt = "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。"
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}"}
+            {
+                "role": "user",
+                "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}",
+            },
         ]
         return self.call(messages, temperature, max_tokens)

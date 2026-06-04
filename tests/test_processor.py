@@ -1,10 +1,12 @@
-from unittest.mock import MagicMock, patch
-from pathlib import Path
+from unittest.mock import patch
+
 from src.finance_risk_rag.processor import DocumentProcessor
+
 
 def test_document_processor_init():
     processor = DocumentProcessor()
     assert processor._llm_client is not None
+
 
 @patch("src.finance_risk_rag.processor.LLMClientWrapper")
 def test_classify_document(mock_llm):
@@ -17,9 +19,11 @@ def test_classify_document(mock_llm):
     assert result["type"] == "财报"
     assert result["confidence"] == 0.95
 
+
 def test_optimize_image_for_ocr():
     from PIL import Image
+
     processor = DocumentProcessor()
-    img = Image.new('RGB', (100, 100), color='white')
+    img = Image.new("RGB", (100, 100), color="white")
     optimized = processor.optimize_image_for_ocr(img)
-    assert optimized.mode == '1'
+    assert optimized.mode == "1"

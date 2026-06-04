@@ -1,22 +1,34 @@
 # extract_entities_bert.py
-import os
 import json
+import os
+
 import torch
 import torch.nn.functional as F
-import numpy as np
-from transformers import AutoTokenizer, AutoModelForTokenClassification
-from collections import defaultdict
 from tqdm import tqdm
+from transformers import AutoModelForTokenClassification, AutoTokenizer
 
 # ====================== 配置参数 =======================
 MODEL_PATH = "bert_ner_model/best_model"
 DOCS_DIR = "docs"
 OUTPUT_FILE = os.path.join(DOCS_DIR, "entities_extracted.json")
 LABEL_LIST = [
-    "O", "B-DATE", "I-DATE", "B-PER", "I-PER",
-    "B-ORG", "I-ORG", "B-MONEY", "I-MONEY",
-    "B-RISK", "I-RISK", "B-SEC", "I-SEC",
-    "B-REG", "I-REG", "B-LAW", "I-LAW"
+    "O",
+    "B-DATE",
+    "I-DATE",
+    "B-PER",
+    "I-PER",
+    "B-ORG",
+    "I-ORG",
+    "B-MONEY",
+    "I-MONEY",
+    "B-RISK",
+    "I-RISK",
+    "B-SEC",
+    "I-SEC",
+    "B-REG",
+    "I-REG",
+    "B-LAW",
+    "I-LAW",
 ]
 id2label = {i: label for i, label in enumerate(LABEL_LIST)}
 label2id = {v: k for k, v in id2label.items()}
@@ -29,16 +41,14 @@ OVERLAP = 50
 def load_model_tokenizer():
     try:
         tokenizer = AutoTokenizer.from_pretrained(
-            MODEL_PATH,
-            local_files_only=True,
-            model_max_length=MAX_SEQ_LEN
+            MODEL_PATH, local_files_only=True, model_max_length=MAX_SEQ_LEN
         )
         model = AutoModelForTokenClassification.from_pretrained(
             MODEL_PATH,
             local_files_only=True,
             num_labels=len(LABEL_LIST),
             id2label=id2label,
-            label2id=label2id
+            label2id=label2id,
         )
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
@@ -61,7 +71,7 @@ def get_risk_score_by_type(entity_type):
         "SEC": 20,
         "REG": 15,
         "LAW": 18,
-        "PER": 8
+        "PER": 8,
     }
     return mapping.get(entity_type, 10)
 
@@ -78,7 +88,7 @@ def extract_entities_from_text(text, model, tokenizer, device, filename="unknown
         truncation=True,
         max_length=MAX_SEQ_LEN,
         padding=True,
-        return_offsets_mapping=True
+        return_offsets_mapping=True,
     )
     offset_mapping = encoded["offset_mapping"][0].cpu().numpy()
 
@@ -117,10 +127,10 @@ def extract_entities_from_text(text, model, tokenizer, device, filename="unknown
                 "entity_group": label[2:],
                 "score": score,
                 "start": int(start),
-                "end": int(end)
+                "end": int(end),
             }
         elif label.startswith("I-") and current and label[2:] == current["entity_group"]:
-            current["word"] += text[current["end"]:end]
+            current["word"] += text[current["end"] : end]
             current["end"] = int(end)
             current["score"] = max(current["score"], score)
 
@@ -140,13 +150,15 @@ def extract_entities_from_text(text, model, tokenizer, device, filename="unknown
         key = (word, typ)
         if key not in seen:
             seen.add(key)
-            filtered.append({
-                "type": typ,
-                "text": word,
-                "risk_score": get_risk_score_by_type(typ),
-                "confidence": round(float(ent["score"]), 4),
-                "source": "bert"
-            })
+            filtered.append(
+                {
+                    "type": typ,
+                    "text": word,
+                    "risk_score": get_risk_score_by_type(typ),
+                    "confidence": round(float(ent["score"]), 4),
+                    "source": "bert",
+                }
+            )
     return filtered
 
 
@@ -181,8 +193,9 @@ def main():
                     "实体类型": ent["type"],
                     "起始位置": None,
                     "结束位置": None,
-                    "置信度": ent["confidence"]
-                } for ent in entities
+                    "置信度": ent["confidence"],
+                }
+                for ent in entities
             ]
             results[filename] = formatted_entities
             print(f"{filename} 处理完成，抽取到 {len(formatted_entities)} 个实体")

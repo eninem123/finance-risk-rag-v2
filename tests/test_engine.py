@@ -1,6 +1,8 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
 from src.finance_risk_rag.engine import RAGEngine, TextChunker
 from src.finance_risk_rag.models import ChunkConfig
+
 
 def test_text_chunker():
     config = ChunkConfig(chunk_size=50, overlap=10)
@@ -10,6 +12,7 @@ def test_text_chunker():
     assert len(chunks) > 0
     for chunk in chunks:
         assert len(chunk) <= config.chunk_size
+
 
 @patch("src.finance_risk_rag.engine.RAGDatabase")
 @patch("src.finance_risk_rag.engine.LLMClientWrapper")

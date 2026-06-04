@@ -6,14 +6,11 @@ Finance-Risk-RAG 文档处理器
 支持增量处理、OCR 优化和基于 LLM 的文档分类。
 """
 
-import glob
-import hashlib
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import pdfplumber
 import pytesseract
@@ -60,7 +57,7 @@ class DocumentProcessor:
             优化后的图像
         """
         # 转换为灰度图
-        image = image.convert('L')
+        image = image.convert("L")
         # 中值滤波去噪
         image = image.filter(ImageFilter.MedianFilter(size=3))
         # 增强亮度
@@ -72,7 +69,7 @@ class DocumentProcessor:
         # 锐化
         image = image.filter(ImageFilter.SHARPEN)
         # 二值化
-        image = image.point(lambda x: 0 if x < 140 else 255, '1')
+        image = image.point(lambda x: 0 if x < 140 else 255, "1")
         return image
 
     def classify_document(self, text_sample: str) -> Dict[str, Any]:
@@ -113,8 +110,7 @@ class DocumentProcessor:
 """
         try:
             content = self._llm_client.call(
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2
+                messages=[{"role": "user", "content": prompt}], temperature=0.2
             )
             # 尝试解析 JSON
             start = content.find("{")
@@ -152,9 +148,7 @@ class DocumentProcessor:
                         img = page.to_image(resolution=self._config.ocr_dpi).original
                         img = self.optimize_image_for_ocr(img)
                         ocr_text = pytesseract.image_to_string(
-                            img,
-                            lang=self._config.ocr_languages,
-                            config='--oem 1 --psm 3'
+                            img, lang=self._config.ocr_languages, config="--oem 1 --psm 3"
                         )
                         text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
                         ocr_pages += 1
@@ -189,12 +183,14 @@ class DocumentProcessor:
 
             # 检查增量处理
             cached = log.get(filename, {})
-            if (cached.get("hash") == file_hash and
-                cached.get("ocr_version") == self._config.ocr_version and
-                txt_path.exists()):
+            if (
+                cached.get("hash") == file_hash
+                and cached.get("ocr_version") == self._config.ocr_version
+                and txt_path.exists()
+            ):
 
                 self._logger.info(f"跳过已处理文件: {filename}")
-                all_text += txt_path.read_text(encoding="utf-8") + "\n\n" + "="*60 + "\n\n"
+                all_text += txt_path.read_text(encoding="utf-8") + "\n\n" + "=" * 60 + "\n\n"
                 classifications[filename] = cached.get("classification")
                 stats["skipped"] += 1
                 continue
@@ -215,10 +211,10 @@ class DocumentProcessor:
                     "ocr_version": self._config.ocr_version,
                     "processed_at": datetime.now().isoformat(),
                     "classification": classification,
-                    "ocr_pages": ocr_count
+                    "ocr_pages": ocr_count,
                 }
 
-                all_text += text + "\n\n" + "="*60 + "\n\n"
+                all_text += text + "\n\n" + "=" * 60 + "\n\n"
                 classifications[filename] = classification
                 stats["processed"] += 1
                 stats["total_ocr_pages"] += ocr_count

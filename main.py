@@ -9,7 +9,6 @@ import argparse
 import sys
 from pathlib import Path
 
-from src.finance_risk_rag.config import get_config
 from src.finance_risk_rag.engine import RAGEngine
 from src.finance_risk_rag.extractor import EntityExtractionPipeline
 from src.finance_risk_rag.processor import DocumentProcessor
@@ -36,7 +35,7 @@ def cmd_extract(args):
     output_path = Path(args.output)
     pipeline.save_result(result, output_path)
 
-    print(f"[+] 提取完成！")
+    print("[+] 提取完成！")
     print(f"    实体数: {len(result.entities)}")
     print(f"    总风险: {result.total_risk_score} ({result.risk_level})")
 
@@ -66,7 +65,7 @@ def cmd_query(args):
 def main():
     parser = argparse.ArgumentParser(
         description="Finance-Risk-RAG: 银行级财务文本风控系统",
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command", help="子命令")
 
@@ -77,8 +76,12 @@ def main():
 
     # extract 子命令
     parser_ext = subparsers.add_parser("extract", help="风险实体提取")
-    parser_ext.add_argument("--input", type=str, default="docs/all_extracted.txt", help="输入文本路径")
-    parser_ext.add_argument("--output", type=str, default="docs/entities_extracted.json", help="输出 JSON 路径")
+    parser_ext.add_argument(
+        "--input", type=str, default="docs/all_extracted.txt", help="输入文本路径"
+    )
+    parser_ext.add_argument(
+        "--output", type=str, default="docs/entities_extracted.json", help="输出 JSON 路径"
+    )
     parser_ext.add_argument("--no-qa", action="store_true", help="禁用交互式问答")
     parser_ext.set_defaults(func=cmd_extract)
 

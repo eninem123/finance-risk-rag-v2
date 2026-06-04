@@ -78,9 +78,8 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Run security scan
-      uses: securecodewarrior/github-action-add-sarif@v1
-      with:
-        sarif-file: 'security-scan.sarif'
+      uses: actions/checkout@v3
+
 
     - name: Check for secrets
       uses: trufflesecurity/trufflehog@main

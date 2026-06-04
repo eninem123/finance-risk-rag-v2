@@ -1,7 +1,8 @@
 # risk_qa_cli.py
-import os
 import argparse
-from rag_core import query, build_db
+
+from rag_core import build_db, query
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -24,13 +25,14 @@ def main():
             for s in res.get("sources", []):
                 print(s)
 
+
 if __name__ == "__main__":
     main()
 
 
-#测试
+# 测试
 # 构建 DB
-#python risk_qa_cli.py --build
+# python risk_qa_cli.py --build
 
 # 提问
-#python risk_qa_cli.py --ask "这份报告的主要风险是什么？"
+# python risk_qa_cli.py --ask "这份报告的主要风险是什么？"
