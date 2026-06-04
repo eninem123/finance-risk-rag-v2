@@ -19,6 +19,7 @@ import json
 import os
 import re
 import time
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -26,8 +27,10 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from openai import OpenAI
 
-from config import get_config
-from utils import (
+from .config import get_config
+from .llm import LLMClientWrapper
+from .models import Entity, ExtractionResult
+from .utils import (
     clean_text,
     calculate_risk_level,
     ensure_dirs,
@@ -36,58 +39,6 @@ from utils import (
     setup_logger,
     safe_delete_directory,
 )
-
-
-# ==================== 数据类定义 ====================
-
-@dataclass
-class Entity:
-    """风险实体数据类"""
-    type: str
-    text: str
-    risk_score: int
-    confidence: float
-    context: str = ""
-    source: str = "rule"
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            "type": self.type,
-            "text": self.text,
-            "risk_score": self.risk_score,
-            "confidence": round(self.confidence, 4),
-            "context": self.context,
-            "source": self.source,
-            **self.metadata
-        }
-    
-    @property
-    def key(self) -> Tuple[str, str]:
-        """实体唯一键（用于去重）"""
-        return (self.text, self.type)
-
-
-@dataclass
-class ExtractionResult:
-    """提取结果数据类"""
-    entities: List[Entity]
-    total_risk_score: int
-    risk_level: str
-    extraction_time: str = field(default_factory=lambda: datetime.now().isoformat())
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            "extracted_at": self.extraction_time,
-            "total_entities": len(self.entities),
-            "total_risk_score": self.total_risk_score,
-            "risk_level": self.risk_level,
-            "entities": [e.to_dict() for e in self.entities],
-            **self.metadata
-        }
 
 
 # ==================== 异常定义 ====================
@@ -367,11 +318,11 @@ class RAGQAService:
             model_name: 模型名称
         """
         config = get_config()
-        self._client = OpenAI(
+        self._llm_client = LLMClientWrapper(
             api_key=api_key or config.llm_api_key,
-            base_url=base_url or config.llm_base_url
+            base_url=base_url or config.llm_base_url,
+            model_name=model_name
         )
-        self._model_name = model_name
         self._logger = logging.getLogger(__name__)
     
     def query(
@@ -419,13 +370,11 @@ class RAGQAService:
         
         try:
             time.sleep(1)  # 避免API限流
-            response = self._client.chat.completions.create(
-                model=self._model_name,
+            return self._llm_client.call(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=0.2
             )
-            return response.choices[0].message.content.strip()
         except Exception as e:
             self._logger.error(f"问答失败: {e}")
             return f"问答失败：{e}"

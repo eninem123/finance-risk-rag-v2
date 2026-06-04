@@ -26,53 +26,14 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Union
 import chromadb
 from chromadb.utils import embedding_functions as ef
 
-from config import CHROMA_DB_DIR, LLM_API_KEY, LLM_BASE_URL
-from utils import clean_text, ensure_dirs, split_text_by_sentence
+from .config import CHROMA_DB_DIR, LLM_API_KEY, LLM_BASE_URL
+from .llm import LLMClientWrapper
+from .models import ChunkConfig, DocumentChunk, EmbeddingBackend, QueryResult
+from .utils import clean_text, ensure_dirs, split_text_by_sentence
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-# ==================== 数据类定义 ====================
-
-class EmbeddingBackend(Enum):
-    """嵌入模型后端枚举"""
-    ONNX = "onnx"
-    SENTENCE_TRANSFORMERS = "sentence_transformers"
-
-
-@dataclass
-class ChunkConfig:
-    """文本分块配置"""
-    chunk_size: int = 800
-    overlap: int = 100
-    
-    def __post_init__(self) -> None:
-        if self.chunk_size <= 0:
-            raise ValueError("chunk_size 必须大于 0")
-        if self.overlap < 0:
-            raise ValueError("overlap 不能为负数")
-        if self.overlap >= self.chunk_size:
-            raise ValueError("overlap 必须小于 chunk_size")
-
-
-@dataclass
-class QueryResult:
-    """查询结果数据类"""
-    answer: str
-    sources: List[Dict[str, Any]]
-    confidence: float = 1.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class DocumentChunk:
-    """文档分块数据类"""
-    content: str
-    source: str
-    chunk_index: int
-    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 # ==================== 协议定义 ====================
@@ -80,12 +41,6 @@ class DocumentChunk:
 class EmbeddingFunction(Protocol):
     """嵌入函数协议"""
     def __call__(self, texts: List[str]) -> List[List[float]]:
-        ...
-
-
-class LLMClient(Protocol):
-    """LLM客户端协议"""
-    def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
         ...
 
 
@@ -164,102 +119,6 @@ class EmbeddingModelFactory:
         return embed
 
 
-# ==================== LLM 客户端 ====================
-
-class LLMClientWrapper:
-    """LLM客户端封装类"""
-    
-    DEFAULT_MODEL = "moonshot-v1-8k"
-    DEFAULT_TEMPERATURE = 0.0
-    DEFAULT_MAX_TOKENS = 512
-    
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        model_name: str = DEFAULT_MODEL
-    ) -> None:
-        """
-        初始化LLM客户端
-        
-        Args:
-            api_key: API密钥
-            base_url: API基础URL
-            model_name: 模型名称
-            
-        Raises:
-            LLMError: 客户端初始化失败
-        """
-        self._api_key = api_key or LLM_API_KEY
-        self._base_url = base_url or LLM_BASE_URL
-        self._model_name = model_name
-        self._client: Optional[Any] = None
-        
-        if not self._api_key:
-            logger.warning(
-                "未检测到 LLM API key。请设置环境变量 OPENAI_API_KEY 或 MOONSHOT_API_KEY。"
-            )
-            return
-        
-        self._initialize_client()
-    
-    def _initialize_client(self) -> None:
-        """初始化OpenAI兼容客户端"""
-        try:
-            from openai import OpenAI
-            self._client = OpenAI(api_key=self._api_key, base_url=self._base_url)
-            logger.info(f"LLM客户端初始化成功，模型: {self._model_name}")
-        except Exception as e:
-            logger.error(f"LLM客户端初始化失败: {e}")
-            raise LLMError(f"无法初始化LLM客户端: {e}") from e
-    
-    @property
-    def is_available(self) -> bool:
-        """检查客户端是否可用"""
-        return self._client is not None
-    
-    def ask(
-        self,
-        query: str,
-        context: str,
-        temperature: float = DEFAULT_TEMPERATURE,
-        max_tokens: int = DEFAULT_MAX_TOKENS
-    ) -> str:
-        """
-        向LLM提问
-        
-        Args:
-            query: 用户问题
-            context: 上下文内容
-            temperature: 温度参数
-            max_tokens: 最大token数
-            
-        Returns:
-            LLM回答
-            
-        Raises:
-            LLMError: LLM调用失败
-        """
-        if not self.is_available:
-            raise LLMError("LLM客户端未初始化，请设置API密钥")
-        
-        system_prompt = "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。"
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}"}
-        ]
-        
-        try:
-            response = self._client.chat.completions.create(
-                model=self._model_name,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            logger.error(f"LLM调用失败: {e}")
-            raise LLMError(f"LLM调用失败: {e}") from e
 
 
 # ==================== 文本分块器 ====================
