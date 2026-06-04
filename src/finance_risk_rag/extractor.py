@@ -24,13 +24,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from .config import get_config
 from .llm import LLMClientWrapper
 from .models import Entity, ExtractionResult
-from .utils import (
-    calculate_risk_level,
-    clean_text,
-    load_json_file,
-    save_json_file,
-    setup_logger,
-)
+from .utils import calculate_risk_level, clean_text, load_json_file, save_json_file, setup_logger
 
 # ==================== 异常定义 ====================
 
@@ -51,7 +45,7 @@ class RuleBasedExtractor:
 
     # 数值提取模式
     NUM_PATTERNS = {
-        "liquidity_risk": r"(现金储备|现金及现金等价物|cash.*reserve).*?(\d+[,\d]*\.?\d*)\s*(亿|亿元|百万|million|billion)",  # noqa: E501  # noqa: E501  # noqa: E501
+        "liquidity_risk": r"(现金储备|现金及现金等价物|cash.*reserve).*?(\d+[,\d]*\.?\d*)\s*(亿|亿元|百万|million|billion)",
         "credit_rating": r"(评级|rating).*?(AAA|AA\+|AA|AA-|A\+|A|A-|BBB\+|BBB|BBB-)",
         "contingent_liability": r"(诉讼|pending litigation).*?(\d+[,\d]*\.?\d*)\s*(亿|万元|USD)",
         "related_transaction": r"(关联交易金额|related party).*?(\d+[,\d]*\.?\d*)\s*(亿|万元|HKD|USD)",
