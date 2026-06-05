@@ -45,7 +45,7 @@ class RuleBasedExtractor:
                 pattern = re.escape(keyword)
                 for match in re.finditer(pattern, text, re.IGNORECASE):
                     start = match.start()
-                    context = text[max(0, start - 50): min(len(text), start + len(keyword) + 50)]
+                    context = text[max(0, start - 50) : min(len(text), start + len(keyword) + 50)]
 
                     entities.append(
                         Entity(
