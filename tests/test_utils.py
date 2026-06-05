@@ -2,7 +2,11 @@
 Unit tests for utility functions.
 """
 
-from src.finance_risk_rag.utils import clean_text, split_text_by_sentence, calculate_risk_level
+from src.finance_risk_rag.utils import (
+    calculate_risk_level,
+    clean_text,
+    split_text_by_sentence,
+)
 
 
 def test_clean_text():

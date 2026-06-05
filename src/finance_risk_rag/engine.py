@@ -4,15 +4,14 @@ RAG core engine for indexing and querying.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, Optional
 
 import chromadb
 from chromadb.utils import embedding_functions as ef
 
 from .config import get_config
-from .exceptions import DatabaseError
 from .llm import LLMClientWrapper
-from .models import ChunkConfig, DocumentChunk, QueryResult
+from .models import QueryResult
 from .utils import clean_text, split_text_by_sentence
 
 
@@ -32,8 +31,7 @@ class RAGEngine:
         self.emb_fn = ef.ONNXMiniLM_L6_V2()
 
         self.collection = self.db_client.get_or_create_collection(
-            name="finance_risk",
-            embedding_function=self.emb_fn
+            name="finance_risk", embedding_function=self.emb_fn
         )
 
     def build_index(self, docs_dir: Optional[Path] = None) -> Dict[str, int]:
@@ -66,20 +64,13 @@ class RAGEngine:
 
     def query(self, question: str, top_k: int = 5) -> QueryResult:
         """Query the RAG system."""
-        results = self.collection.query(
-            query_texts=[question],
-            n_results=top_k
-        )
+        results = self.collection.query(query_texts=[question], n_results=top_k)
 
         # Flatten results
-        docs = results['documents'][0]
-        metas = results['metadatas'][0]
+        docs = results["documents"][0]
+        metas = results["metadatas"][0]
 
         context = "\n\n".join(docs)
         answer = self.llm.ask(question, context)
 
-        return QueryResult(
-            answer=answer,
-            sources=metas,
-            confidence=1.0
-        )
+        return QueryResult(answer=answer, sources=metas, confidence=1.0)

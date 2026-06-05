@@ -5,12 +5,12 @@ Risk entity extraction module.
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from .config import get_config
 from .exceptions import RuleLoadError
 from .models import Entity, ExtractionResult
-from .utils import clean_text, calculate_risk_level, load_json_file
+from .utils import calculate_risk_level, clean_text, load_json_file
 
 
 class RuleBasedExtractor:
@@ -45,16 +45,18 @@ class RuleBasedExtractor:
                 pattern = re.escape(keyword)
                 for match in re.finditer(pattern, text, re.IGNORECASE):
                     start = match.start()
-                    context = text[max(0, start-50):min(len(text), start+len(keyword)+50)]
+                    context = text[max(0, start - 50): min(len(text), start + len(keyword) + 50)]
 
-                    entities.append(Entity(
-                        type=entity_type,
-                        text=keyword,
-                        risk_score=risk_score,
-                        confidence=1.0,
-                        context=context.strip(),
-                        source="rule"
-                    ))
+                    entities.append(
+                        Entity(
+                            type=entity_type,
+                            text=keyword,
+                            risk_score=risk_score,
+                            confidence=1.0,
+                            context=context.strip(),
+                            source="rule",
+                        )
+                    )
         return entities
 
 
@@ -74,7 +76,7 @@ class BERTExtractor:
         """Lazy load BERT model."""
         try:
             from transformers import AutoModelForTokenClassification, AutoTokenizer
-            import torch
+
             self.tokenizer = AutoTokenizer.from_pretrained(str(self.model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(self.model_path))
             self.logger.info("BERT model loaded successfully")
@@ -126,7 +128,5 @@ class EntityExtractionPipeline:
         risk_level = calculate_risk_level(total_score)
 
         return ExtractionResult(
-            entities=final_entities,
-            total_risk_score=total_score,
-            risk_level=risk_level
+            entities=final_entities, total_risk_score=total_score, risk_level=risk_level
         )

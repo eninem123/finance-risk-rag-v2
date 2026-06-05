@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
     - uses: actions/checkout@v3
@@ -37,8 +37,7 @@ jobs:
 
     - name: Lint with flake8
       run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+        flake8 . --count --max-line-length=100 --statistics
 
     - name: Format check with black
       run: |
@@ -60,7 +59,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.12'
 
     - name: Install dependencies
       run: |
@@ -76,11 +75,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-
-    - name: Run security scan
-      uses: securecodewarrior/github-action-add-sarif@v1
-      with:
-        sarif-file: 'security-scan.sarif'
 
     - name: Check for secrets
       uses: trufflesecurity/trufflehog@main

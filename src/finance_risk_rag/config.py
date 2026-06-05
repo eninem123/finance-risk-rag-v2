@@ -5,7 +5,7 @@ Configuration management for the Finance-Risk-RAG system.
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 
 @dataclass
@@ -108,11 +108,12 @@ class Config:
             "llm_provider": self.llm_provider,
             "llm_model_name": self.llm_model_name,
             "chunk_size": self.chunk_size,
-            "ocr_version": self.ocr_version
+            "ocr_version": self.ocr_version,
         }
 
 
 _config: Optional[Config] = None
+
 
 def get_config() -> Config:
     global _config

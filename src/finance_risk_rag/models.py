@@ -4,12 +4,13 @@ Shared data models for the Finance-Risk-RAG system.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 
 @dataclass
 class Entity:
     """Risk entity data class."""
+
     type: str
     text: str
     risk_score: int
@@ -27,7 +28,7 @@ class Entity:
             "confidence": round(self.confidence, 4),
             "context": self.context,
             "source": self.source,
-            **self.metadata
+            **self.metadata,
         }
 
     @property
@@ -39,6 +40,7 @@ class Entity:
 @dataclass
 class ExtractionResult:
     """Data class for extraction results."""
+
     entities: List[Entity]
     total_risk_score: int
     risk_level: str
@@ -53,13 +55,14 @@ class ExtractionResult:
             "total_risk_score": self.total_risk_score,
             "risk_level": self.risk_level,
             "entities": [e.to_dict() for e in self.entities],
-            **self.metadata
+            **self.metadata,
         }
 
 
 @dataclass
 class QueryResult:
     """Data class for RAG query results."""
+
     answer: str
     sources: List[Dict[str, Any]]
     confidence: float = 1.0
@@ -69,6 +72,7 @@ class QueryResult:
 @dataclass
 class ChunkConfig:
     """Configuration for text chunking."""
+
     chunk_size: int = 800
     overlap: int = 100
 
@@ -84,6 +88,7 @@ class ChunkConfig:
 @dataclass
 class DocumentChunk:
     """Data class for a document chunk."""
+
     content: str
     source: str
     chunk_index: int

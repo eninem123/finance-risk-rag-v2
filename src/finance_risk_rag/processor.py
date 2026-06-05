@@ -6,7 +6,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Any, Dict, Optional, Tuple
 
 import pdfplumber
 import pytesseract
@@ -31,7 +31,7 @@ class DocumentProcessor:
 
     def optimize_image(self, image: Image.Image) -> Image.Image:
         """Optimize image for better OCR results."""
-        image = image.convert('L')
+        image = image.convert("L")
         image = image.filter(ImageFilter.MedianFilter(size=3))
         enhancer = ImageEnhance.Contrast(image)
         image = enhancer.enhance(2.0)
@@ -51,9 +51,7 @@ class DocumentProcessor:
                     else:
                         img = page.to_image(resolution=self.config.ocr_dpi).original
                         img = self.optimize_image(img)
-                        ocr_text = pytesseract.image_to_string(
-                            img, lang=self.config.ocr_languages
-                        )
+                        ocr_text = pytesseract.image_to_string(img, lang=self.config.ocr_languages)
                         text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
                         ocr_pages += 1
         except Exception as e:
@@ -67,15 +65,13 @@ class DocumentProcessor:
         if not self.llm.is_available:
             return {"type": "Unknown", "confidence": 0.0}
 
-        prompt = f"""
-Classify this financial document into one of these categories:
-1. Audit Report, 2. Industry Report, 3. Company Research, 4. IPO Prospectus, 5. Financial Statement, 6. Other.
-
-Text sample:
-{text_sample[:2000]}
-
-Respond ONLY in JSON: {{"type": "...", "confidence": 0.95, "reason": "..."}}
-"""
+        prompt = (
+            "Classify this financial document into one of these categories:\n"
+            "1. Audit Report, 2. Industry Report, 3. Company Research, "
+            "4. IPO Prospectus, 5. Financial Statement, 6. Other.\n\n"
+            f"Text sample:\n{text_sample[:2000]}\n\n"
+            'Respond ONLY in JSON: {"type": "...", "confidence": 0.95, "reason": "..."}'
+        )
         try:
             response = self.llm.chat([{"role": "user", "content": prompt}])
             # Basic JSON extraction from response
@@ -98,9 +94,11 @@ Respond ONLY in JSON: {{"type": "...", "confidence": 0.95, "reason": "..."}}
             cached = log.get(pdf_path.name, {})
             txt_path = pdf_path.with_suffix(".txt")
 
-            if (cached.get("hash") == file_hash and
-                cached.get("ocr_version") == self.config.ocr_version and
-                txt_path.exists()):
+            if (
+                cached.get("hash") == file_hash
+                and cached.get("ocr_version") == self.config.ocr_version
+                and txt_path.exists()
+            ):
                 self.logger.info(f"Skipping {pdf_path.name} (already processed)")
                 with open(txt_path, "r", encoding="utf-8") as f:
                     text = f.read()
@@ -117,10 +115,10 @@ Respond ONLY in JSON: {{"type": "...", "confidence": 0.95, "reason": "..."}}
                     "ocr_version": self.config.ocr_version,
                     "processed_at": datetime.now().isoformat(),
                     "classification": classification,
-                    "ocr_pages": ocr_count
+                    "ocr_pages": ocr_count,
                 }
 
-            all_text += text + "\n\n" + "="*60 + "\n\n"
+            all_text += text + "\n\n" + "=" * 60 + "\n\n"
 
         # Save consolidated text
         with open(docs_dir / "all_extracted.txt", "w", encoding="utf-8") as f:

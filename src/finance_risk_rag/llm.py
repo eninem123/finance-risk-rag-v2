@@ -18,7 +18,7 @@ class LLMClientWrapper:
         self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        model_name: Optional[str] = None
+        model_name: Optional[str] = None,
     ) -> None:
         config = get_config()
         self.api_key = api_key or config.llm_api_key
@@ -40,10 +40,7 @@ class LLMClientWrapper:
         return self.client is not None
 
     def chat(
-        self,
-        messages: List[Dict[str, str]],
-        temperature: float = 0.2,
-        max_tokens: int = 1000
+        self, messages: List[Dict[str, str]], temperature: float = 0.2, max_tokens: int = 1000
     ) -> str:
         """Send a chat completion request."""
         if not self.client:
@@ -54,7 +51,7 @@ class LLMClientWrapper:
                 model=self.model_name,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
@@ -64,7 +61,13 @@ class LLMClientWrapper:
     def ask(self, query: str, context: str) -> str:
         """Simplified ask interface with context."""
         messages = [
-            {"role": "system", "content": "You are a professional financial risk analyst. Answer based on the provided context."},
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
+            {
+                "role": "system",
+                "content": (
+                    "You are a professional financial risk analyst. "
+                    "Answer based on the provided context."
+                ),
+            },
+            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"},
         ]
         return self.chat(messages)

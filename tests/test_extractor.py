@@ -3,7 +3,6 @@ Unit tests for entity extraction.
 """
 
 from src.finance_risk_rag.extractor import RuleBasedExtractor
-from src.finance_risk_rag.models import Entity
 
 
 def test_rule_based_extractor_extract():
