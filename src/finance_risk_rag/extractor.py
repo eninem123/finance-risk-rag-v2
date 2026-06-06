@@ -6,14 +6,15 @@ Finance-Risk-RAG 实体提取模块
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import List, Optional, Set, Tuple, Union
 
 from .config import get_config
 from .exceptions import ExtractionError
 from .models import Entity, ExtractionResult
-from .utils import clean_text, calculate_risk_level, load_json_file
+from .utils import calculate_risk_level, clean_text, load_json_file
 
 logger = logging.getLogger(__name__)
+
 
 class RuleBasedExtractor:
     """基于规则的实体提取器"""
@@ -59,18 +60,22 @@ class RuleBasedExtractor:
                     context_end = min(len(text), start + len(keyword) + 80)
                     context = text[context_start:context_end].replace("\n", " ").strip()
 
-                    entities.append(Entity(
-                        type=entity_type,
-                        text=keyword,
-                        risk_score=base_risk_score,
-                        confidence=1.0,
-                        context=context,
-                        source="rule"
-                    ))
+                    entities.append(
+                        Entity(
+                            type=entity_type,
+                            text=keyword,
+                            risk_score=base_risk_score,
+                            confidence=1.0,
+                            context=context,
+                            source="rule",
+                        )
+                    )
         return entities
+
 
 class BERTExtractor:
     """基于 BERT 的实体提取器"""
+
     def __init__(self, model_path: Optional[Path] = None):
         self.model = None
         self.tokenizer = None
@@ -81,7 +86,11 @@ class BERTExtractor:
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
+            from transformers import (
+                AutoModelForTokenClassification,
+                AutoTokenizer,
+                pipeline,
+            )
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
@@ -91,7 +100,7 @@ class BERTExtractor:
                 model=self.model,
                 tokenizer=self.tokenizer,
                 device=self.device,
-                aggregation_strategy="simple"
+                aggregation_strategy="simple",
             )
             logger.info(f"BERT model loaded from {model_path}")
         except Exception as e:
@@ -110,21 +119,25 @@ class BERTExtractor:
             results = self.nlp(text)
             entities = []
             for res in results:
-                entities.append(Entity(
-                    type=res['entity_group'],
-                    text=res['word'],
-                    risk_score=20,  # Default risk score for BERT entities
-                    confidence=float(res['score']),
-                    context=text[max(0, res['start']-40):min(len(text), res['end']+40)],
-                    source="bert"
-                ))
+                entities.append(
+                    Entity(
+                        type=res["entity_group"],
+                        text=res["word"],
+                        risk_score=20,  # Default risk score for BERT entities
+                        confidence=float(res["score"]),
+                        context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
+                        source="bert",
+                    )
+                )
             return entities
         except Exception as e:
             logger.error(f"BERT extraction failed: {e}")
             return []
 
+
 class EntityExtractionPipeline:
     """实体提取管道"""
+
     def __init__(self, config=None):
         self.config = config or get_config()
         self.rule_extractor = RuleBasedExtractor()
@@ -155,7 +168,5 @@ class EntityExtractionPipeline:
         risk_level = calculate_risk_level(total_risk)
 
         return ExtractionResult(
-            entities=entities_list,
-            total_risk_score=total_risk,
-            risk_level=risk_level
+            entities=entities_list, total_risk_score=total_risk, risk_level=risk_level
         )

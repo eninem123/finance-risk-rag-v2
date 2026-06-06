@@ -7,12 +7,13 @@ Finance-Risk-RAG 数据模型模块
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 
 @dataclass
 class Entity:
     """风险实体数据类"""
+
     type: str
     text: str
     risk_score: int
@@ -30,7 +31,7 @@ class Entity:
             "confidence": round(self.confidence, 4),
             "context": self.context,
             "source": self.source,
-            **self.metadata
+            **self.metadata,
         }
 
     @property
@@ -42,6 +43,7 @@ class Entity:
 @dataclass
 class ExtractionResult:
     """提取结果数据类"""
+
     entities: List[Entity]
     total_risk_score: int
     risk_level: str
@@ -56,13 +58,14 @@ class ExtractionResult:
             "total_risk_score": self.total_risk_score,
             "risk_level": self.risk_level,
             "entities": [e.to_dict() for e in self.entities],
-            **self.metadata
+            **self.metadata,
         }
 
 
 @dataclass
 class ChunkConfig:
     """文本分块配置"""
+
     chunk_size: int = 800
     overlap: int = 100
 
@@ -70,6 +73,7 @@ class ChunkConfig:
 @dataclass
 class DocumentChunk:
     """文档分块数据类"""
+
     content: str
     source: str
     chunk_index: int
@@ -79,6 +83,7 @@ class DocumentChunk:
 @dataclass
 class QueryResult:
     """查询结果数据类"""
+
     answer: str
     sources: List[Dict[str, Any]]
     confidence: float = 1.0
@@ -88,13 +93,10 @@ class QueryResult:
 @dataclass
 class ClassificationResult:
     """文档分类结果"""
+
     type: str
     confidence: float
     reason: str
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "type": self.type,
-            "confidence": self.confidence,
-            "reason": self.reason
-        }
+        return {"type": self.type, "confidence": self.confidence, "reason": self.reason}

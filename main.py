@@ -4,14 +4,14 @@ Finance-Risk-RAG 统一命令行入口
 """
 
 import argparse
-import sys
 from pathlib import Path
 
 from src.finance_risk_rag.config import get_config
-from src.finance_risk_rag.processor import DocumentProcessor
-from src.finance_risk_rag.extractor import EntityExtractionPipeline
 from src.finance_risk_rag.engine import RAGEngine
+from src.finance_risk_rag.extractor import EntityExtractionPipeline
+from src.finance_risk_rag.processor import DocumentProcessor
 from src.finance_risk_rag.utils import setup_logger
+
 
 def main():
     parser = argparse.ArgumentParser(description="Finance-Risk-RAG: 银行级财务文本风控 AI 系统")
@@ -23,8 +23,12 @@ def main():
 
     # Extract 子命令
     extract_parser = subparsers.add_parser("extract", help="提取风险实体")
-    extract_parser.add_argument("--input", type=str, default="docs/all_extracted.txt", help="输入文本文件")
-    extract_parser.add_argument("--output", type=str, default="docs/entities_extracted.json", help="输出 JSON 文件")
+    extract_parser.add_argument(
+        "--input", type=str, default="docs/all_extracted.txt", help="输入文本文件"
+    )
+    extract_parser.add_argument(
+        "--output", type=str, default="docs/entities_extracted.json", help="输出 JSON 文件"
+    )
 
     # Query 子命令
     query_parser = subparsers.add_parser("query", help="执行 RAG 问答")
@@ -46,6 +50,7 @@ def main():
         result = pipeline.process(Path(args.input))
         # Save result
         from src.finance_risk_rag.utils import save_json_file
+
         save_json_file(result.to_dict(), Path(args.output))
         print(f"实体提取完成。风险等级: {result.risk_level}, 总分: {result.total_risk_score}")
 
@@ -61,6 +66,7 @@ def main():
 
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()

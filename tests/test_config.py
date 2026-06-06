@@ -1,5 +1,5 @@
-import pytest
 from src.finance_risk_rag.config import get_config
+
 
 def test_config():
     config = get_config()

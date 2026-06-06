@@ -5,7 +5,7 @@ Finance-Risk-RAG 文档处理模块
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional, Tuple
 
 import pdfplumber
 import pytesseract
@@ -13,11 +13,12 @@ from PIL import Image, ImageEnhance, ImageFilter
 
 from .config import get_config
 from .exceptions import OCRError
-from .models import ClassificationResult
 from .llm import LLMClientWrapper
+from .models import ClassificationResult
 from .utils import get_file_hash, load_json_file, save_json_file
 
 logger = logging.getLogger(__name__)
+
 
 class DocumentProcessor:
     """处理 PDF 文档并提取文本"""
@@ -29,14 +30,14 @@ class DocumentProcessor:
             pytesseract.pytesseract.tesseract_cmd = self.config.tesseract_cmd
 
     def optimize_image_for_ocr(self, image: Image.Image) -> Image.Image:
-        image = image.convert('L')
+        image = image.convert("L")
         image = image.filter(ImageFilter.MedianFilter(size=3))
         enhancer = ImageEnhance.Brightness(image)
         image = enhancer.enhance(1.2)
         enhancer = ImageEnhance.Contrast(image)
         image = enhancer.enhance(2.5)
         image = image.filter(ImageFilter.SHARPEN)
-        image = image.point(lambda x: 0 if x < 140 else 255, '1')
+        image = image.point(lambda x: 0 if x < 140 else 255, "1")
         return image
 
     def classify_document(self, text_sample: str) -> ClassificationResult:
@@ -63,6 +64,7 @@ class DocumentProcessor:
 """
         try:
             import json
+
             response = self.llm_client.chat([{"role": "user", "content": prompt}], temperature=0.2)
             start = response.find("{")
             end = response.rfind("}") + 1
@@ -70,7 +72,7 @@ class DocumentProcessor:
             return ClassificationResult(
                 type=data.get("type", "其他"),
                 confidence=data.get("confidence", 0.0),
-                reason=data.get("reason", "")
+                reason=data.get("reason", ""),
             )
         except Exception as e:
             logger.error(f"Classification failed: {e}")
@@ -89,7 +91,7 @@ class DocumentProcessor:
                         img = page.to_image(resolution=self.config.ocr_dpi).original
                         img = self.optimize_image_for_ocr(img)
                         ocr_text = pytesseract.image_to_string(
-                            img, lang=self.config.ocr_languages, config='--oem 1 --psm 3'
+                            img, lang=self.config.ocr_languages, config="--oem 1 --psm 3"
                         )
                         text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
                         ocr_pages += 1
@@ -111,16 +113,18 @@ class DocumentProcessor:
             cached = log.get(pdf_path.name, {})
             txt_path = pdf_path.with_suffix(".txt")
 
-            if (cached.get("hash") == file_hash and
-                cached.get("ocr_version") == self.config.ocr_version and
-                txt_path.exists()):
+            if (
+                cached.get("hash") == file_hash
+                and cached.get("ocr_version") == self.config.ocr_version
+                and txt_path.exists()
+            ):
                 logger.info(f"Skipping {pdf_path.name} (cached)")
                 text = txt_path.read_text(encoding="utf-8")
                 classification_data = cached.get("classification", {"type": "未知"})
                 classification = ClassificationResult(
                     type=classification_data.get("type", "未知"),
                     confidence=classification_data.get("confidence", 0.0),
-                    reason=classification_data.get("reason", "")
+                    reason=classification_data.get("reason", ""),
                 )
             else:
                 logger.info(f"Processing {pdf_path.name}")
@@ -132,10 +136,10 @@ class DocumentProcessor:
                     "hash": file_hash,
                     "ocr_version": self.config.ocr_version,
                     "classification": classification.to_dict(),
-                    "ocr_pages": ocr_count
+                    "ocr_pages": ocr_count,
                 }
 
-            all_text += text + "\n\n" + "="*60 + "\n\n"
+            all_text += text + "\n\n" + "=" * 60 + "\n\n"
             classifications[pdf_path.name] = classification.to_dict()
 
         (docs_dir / "all_extracted.txt").write_text(all_text, encoding="utf-8")

@@ -5,7 +5,7 @@ Finance-Risk-RAG RAG 引擎模块
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import List
 
 import chromadb
 from chromadb.utils import embedding_functions as ef
@@ -13,10 +13,11 @@ from chromadb.utils import embedding_functions as ef
 from .config import get_config
 from .exceptions import DatabaseError, RAGError
 from .llm import LLMClientWrapper
-from .models import ChunkConfig, DocumentChunk, QueryResult
+from .models import QueryResult
 from .utils import clean_text, ensure_dirs, split_text_by_sentence
 
 logger = logging.getLogger(__name__)
+
 
 class RAGEngine:
     """RAG 引擎主类"""
@@ -35,8 +36,7 @@ class RAGEngine:
             # Use ONNX as default embedding function
             self._emb_fn = ef.ONNXMiniLM_L6_V2(preferred_providers=["CPUExecutionProvider"])
             self._collection = self._client.get_or_create_collection(
-                name="finance_docs",
-                embedding_function=self._emb_fn
+                name="finance_docs", embedding_function=self._emb_fn
             )
         except Exception as e:
             raise DatabaseError(f"Failed to initialize ChromaDB: {e}")
@@ -65,10 +65,7 @@ class RAGEngine:
 
     def query(self, question: str, top_k: int = 4) -> QueryResult:
         try:
-            results = self._collection.query(
-                query_texts=[question],
-                n_results=top_k
-            )
+            results = self._collection.query(query_texts=[question], n_results=top_k)
 
             docs = results.get("documents", [[]])[0]
             metas = results.get("metadatas", [[]])[0]
@@ -76,11 +73,7 @@ class RAGEngine:
             context = "\n\n".join(docs)
             answer = self.llm_client.ask(question, context)
 
-            return QueryResult(
-                answer=answer,
-                sources=metas,
-                confidence=1.0
-            )
+            return QueryResult(answer=answer, sources=metas, confidence=1.0)
         except Exception as e:
             raise RAGError(f"Query failed: {e}")
 

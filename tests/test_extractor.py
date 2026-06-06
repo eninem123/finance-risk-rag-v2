@@ -1,17 +1,12 @@
-import pytest
-from pathlib import Path
 from src.finance_risk_rag.extractor import RuleBasedExtractor
+
 
 def test_rule_based_extractor(tmp_path):
     # Create dummy rules
     rules_file = tmp_path / "rules.json"
     import json
-    rules = {
-        "liquidity_risk": {
-            "keywords": ["现金流", "流动性"],
-            "risk_score": 20
-        }
-    }
+
+    rules = {"liquidity_risk": {"keywords": ["现金流", "流动性"], "risk_score": 20}}
     rules_file.write_text(json.dumps(rules), encoding="utf-8")
 
     extractor = RuleBasedExtractor(rules_path=rules_file)
