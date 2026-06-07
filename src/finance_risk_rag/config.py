@@ -1,16 +1,3 @@
-"""
-Finance-Risk-RAG 配置模块
-========================
-
-集中管理系统配置参数，支持环境变量覆盖。
-
-使用方法:
-    from config import Config
-    
-    config = Config()
-    print(config.llm_api_key)
-"""
-
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,7 +15,7 @@ class Config:
     # ==================== 路径配置 ====================
     
     # 项目根目录
-    base_dir: Path = field(default_factory=lambda: Path(__file__).parent.resolve())
+    base_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
     
     # BERT本地模型路径
     bert_local_path: Optional[Path] = None
@@ -233,35 +220,3 @@ def get_config() -> Config:
     if _config is None:
         _config = Config()
     return _config
-
-
-# 向后兼容的模块级变量
-_config_instance = get_config()
-
-# 路径配置
-BASE_DIR = _config_instance.base_dir
-BERT_LOCAL_PATH = _config_instance.bert_local_path
-CHROMA_DB_DIR = _config_instance.chroma_db_dir
-
-# LLM配置
-LLM_PROVIDER = _config_instance.llm_provider
-LLM_API_KEY = _config_instance.llm_api_key
-LLM_BASE_URL = _config_instance.llm_base_url
-
-# 嵌入模型配置
-EMBEDDING_BACKEND = _config_instance.embedding_backend
-
-# OCR配置
-TESSERACT_CMD = _config_instance.tesseract_cmd
-
-# 处理配置
-MAX_CONTEXT_TOKENS = _config_instance.max_context_tokens
-
-
-if __name__ == "__main__":
-    config = get_config()
-    print("配置信息:")
-    for key, value in config.to_dict().items():
-        print(f"  {key}: {value}")
-    
-    print(f"\n配置验证: {'通过' if config.validate() else '失败'}")

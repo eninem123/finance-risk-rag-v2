@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finance-risk-rag"
+version = "2.1.0"
+description = "银行级多语言财务文本风控AI系统"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "jieba>=0.42.1",
+    "pdfplumber>=0.11.0",
+    "pytesseract>=0.3.10",
+    "Pillow>=10.0.0",
+    "chromadb>=0.4.15",
+    "sentence-transformers>=2.2.0",
+    "onnxruntime>=1.15.0",
+    "openai>=1.0.0",
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+finance-risk-rag = "main:main"
