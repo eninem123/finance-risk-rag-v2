@@ -1,10 +1,8 @@
-import os
-import glob
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 import pdfplumber
 import pytesseract
@@ -29,14 +27,14 @@ class DocumentProcessor:
 
     def _optimize_image_for_ocr(self, image: Image.Image) -> Image.Image:
         """OCR 图像优化"""
-        image = image.convert('L')
+        image = image.convert("L")
         image = image.filter(ImageFilter.MedianFilter(size=3))
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(1.2)
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(2.5)
+        bright_enhancer = ImageEnhance.Brightness(image)
+        image = bright_enhancer.enhance(1.2)
+        contrast_enhancer = ImageEnhance.Contrast(image)
+        image = contrast_enhancer.enhance(2.5)
         image = image.filter(ImageFilter.SHARPEN)
-        image = image.point(lambda x: 0 if x < 140 else 255, '1')
+        image = image.point(lambda x: 0 if x < 140 else 255, "1")
         return image
 
     def classify_document(self, text_sample: str) -> Dict[str, Any]:
@@ -66,9 +64,7 @@ class DocumentProcessor:
 """
         try:
             content = self.llm_client.ask(
-                query=prompt,
-                context="",
-                system_prompt="你是一个文档分类专家，只返回 JSON。"
+                query=prompt, context="", system_prompt="你是一个文档分类专家，只返回 JSON。"
             )
             start = content.find("{")
             end = content.rfind("}") + 1
@@ -78,7 +74,9 @@ class DocumentProcessor:
             logger.error(f"分类失败: {e}")
             return {"type": "未知", "confidence": 0.0, "reason": str(e)}
 
-    def extract_text_from_pdf(self, pdf_path: Path, output_txt: Path) -> Tuple[str, Dict[str, Any], int]:
+    def extract_text_from_pdf(
+        self, pdf_path: Path, output_txt: Path
+    ) -> Tuple[str, Dict[str, Any], int]:
         """从 PDF 提取文本，必要时使用 OCR"""
         text = f"# 文件: {pdf_path.name}\n\n"
         ocr_pages = 0
@@ -93,9 +91,7 @@ class DocumentProcessor:
                         img = page.to_image(resolution=self.config.ocr_dpi).original
                         img = self._optimize_image_for_ocr(img)
                         ocr_text = pytesseract.image_to_string(
-                            img,
-                            lang=self.config.ocr_languages,
-                            config='--oem 1 --psm 3'
+                            img, lang=self.config.ocr_languages, config="--oem 1 --psm 3"
                         )
                         text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
                         ocr_pages += 1
@@ -123,9 +119,11 @@ class DocumentProcessor:
             txt_path = pdf_path.with_suffix(".txt")
 
             cached = log.get(filename, {})
-            if (cached.get("hash") == file_hash and
-                cached.get("ocr_version") == self.config.ocr_version and
-                txt_path.exists()):
+            if (
+                cached.get("hash") == file_hash
+                and cached.get("ocr_version") == self.config.ocr_version
+                and txt_path.exists()
+            ):
                 logger.info(f"跳过: {filename} (已处理)")
                 text = txt_path.read_text(encoding="utf-8")
                 classification = cached["classification"]
@@ -140,10 +138,10 @@ class DocumentProcessor:
                     "ocr_version": self.config.ocr_version,
                     "processed_at": datetime.now().isoformat(),
                     "classification": classification,
-                    "ocr_pages": ocr_count
+                    "ocr_pages": ocr_count,
                 }
 
-            all_text += text + "\n\n" + "="*60 + "\n\n"
+            all_text += text + "\n\n" + "=" * 60 + "\n\n"
             classifications[filename] = classification
 
         (self.config.docs_dir / "all_extracted.txt").write_text(all_text, encoding="utf-8")
@@ -153,5 +151,5 @@ class DocumentProcessor:
         return {
             "processed": processed,
             "skipped": len(pdf_files) - processed,
-            "total_ocr_pages": total_ocr
+            "total_ocr_pages": total_ocr,
         }

@@ -1,11 +1,16 @@
-import pytest
-from finance_risk_rag.utils import clean_text, split_text_by_sentence, calculate_risk_level
+from finance_risk_rag.utils import (
+    calculate_risk_level,
+    clean_text,
+    split_text_by_sentence,
+)
+
 
 def test_clean_text():
     assert clean_text("  hello   world  ") == "hello world"
     assert clean_text("3。5") == "3.5"
     assert clean_text("价格。") == "价格."
     assert clean_text("你好，世界；") == "你好,世界;"
+
 
 def test_split_text_by_sentence():
     text = "这是一个测试。这是第二个测试！"
@@ -14,6 +19,7 @@ def test_split_text_by_sentence():
     assert len(sentences) == 2
     assert "这是一个测试。" in sentences
     assert "这是第二个测试！" in sentences
+
 
 def test_calculate_risk_level():
     assert calculate_risk_level(20) == "低风险"

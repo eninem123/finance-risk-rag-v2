@@ -1,14 +1,12 @@
 import hashlib
 import json
 import logging
-import os
 import re
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, List, Optional, Union
 
-import jieba
 from finance_risk_rag.exceptions import FileOperationError
 
 # 类型别名
@@ -26,9 +24,7 @@ def ensure_dirs(*dirs: PathLike) -> None:
 
 
 def safe_delete_directory(
-    dir_path: PathLike,
-    max_retries: int = 5,
-    retry_delay: float = 2.0
+    dir_path: PathLike, max_retries: int = 5, retry_delay: float = 2.0
 ) -> bool:
     """
     安全删除目录（解决Windows文件占用问题）
@@ -84,29 +80,25 @@ def clean_text(text: str) -> str:
         return ""
 
     # 去除连续空格和换行
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
 
     # 去除特殊控制字符
-    text = re.sub(r'[\x00-\x1F\x7F]', '', text)
+    text = re.sub(r"[\x00-\x1F\x7F]", "", text)
 
     # 统一中文标点 (考虑小数点 3。5 -> 3.5)
-    text = text.replace('。', '.').replace('，', ',').replace('；', ';')
+    text = text.replace("。", ".").replace("，", ",").replace("；", ";")
 
     return text
 
 
-def split_text_by_sentence(
-    text: str,
-    max_len: int = 200,
-    min_len: int = 20
-) -> List[str]:
+def split_text_by_sentence(text: str, max_len: int = 200, min_len: int = 20) -> List[str]:
     """
     按句子拆分文本
     """
     if not text:
         return []
 
-    sentence_seps = r'(?<!\d)([。！？；.!?;])(?![0-9.])'
+    sentence_seps = r"(?<!\d)([。！？；.!?;])(?![0-9.])"
     # 使用捕获组保留分隔符
     parts = [p.strip() for p in re.split(sentence_seps, text) if p is not None]
 
@@ -114,11 +106,11 @@ def split_text_by_sentence(
     i = 0
     while i < len(parts):
         content = parts[i]
-        if not content and i + 1 < len(parts): # 处理连续分隔符或起始分隔符
-             i += 1
-             continue
+        if not content and i + 1 < len(parts):  # 处理连续分隔符或起始分隔符
+            i += 1
+            continue
 
-        if i + 1 < len(parts) and parts[i+1] in "。！？；.!?;":
+        if i + 1 < len(parts) and parts[i + 1] in "。！？；.!?;":
             sep = parts[i + 1]
             sentences.append(f"{content}{sep}")
             i += 2
@@ -131,8 +123,14 @@ def split_text_by_sentence(
     current = ""
 
     new_topic_flags = {
-        "涉及", "此外", "同时", "另外", "其中",
-        "值得注意的是", "需要说明的是", "综上所述"
+        "涉及",
+        "此外",
+        "同时",
+        "另外",
+        "其中",
+        "值得注意的是",
+        "需要说明的是",
+        "综上所述",
     }
 
     for sent in sentences:
@@ -151,7 +149,7 @@ def split_text_by_sentence(
 
     result = []
     for s in merged:
-        s = re.sub(r'([。！？；.!?;])+', r'\1', s.strip())
+        s = re.sub(r"([。！？；.!?;])+", r"\1", s.strip())
         if s and len(s) >= min_len:
             result.append(s)
 
@@ -167,17 +165,14 @@ def load_json_file(file_path: PathLike, default: Any = None) -> Any:
         return default if default is not None else {}
 
     try:
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return default if default is not None else {}
 
 
 def save_json_file(
-    data: Any,
-    file_path: PathLike,
-    ensure_dir: bool = True,
-    indent: int = 2
+    data: Any, file_path: PathLike, ensure_dir: bool = True, indent: int = 2
 ) -> bool:
     """
     安全保存JSON文件
@@ -186,7 +181,7 @@ def save_json_file(
     try:
         if ensure_dir:
             path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=indent)
         return True
     except Exception:
@@ -208,14 +203,12 @@ def calculate_risk_level(score: float) -> str:
 
 
 def setup_logger(
-    name: str,
-    log_file: Optional[str] = None,
-    level: int = logging.INFO
+    name: str, log_file: Optional[str] = None, level: int = logging.INFO
 ) -> logging.Logger:
     """
     配置自定义日志器
     """
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.handlers.clear()
@@ -223,7 +216,7 @@ def setup_logger(
     if log_file:
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 

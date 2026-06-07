@@ -1,14 +1,14 @@
 import argparse
-import sys
 import logging
 from pathlib import Path
 
-from finance_risk_rag.config import get_config
-from finance_risk_rag.processor import DocumentProcessor
-from finance_risk_rag.extractor import EntityExtractionPipeline
 from finance_risk_rag.engine import RAGEngine
+from finance_risk_rag.extractor import EntityExtractionPipeline
+from finance_risk_rag.processor import DocumentProcessor
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger("main")
 
 
@@ -29,7 +29,7 @@ def cmd_extract(args):
     output_path = Path(args.output)
     pipeline.save_result(result, output_path)
 
-    print(f"实体提取完成!")
+    print("实体提取完成!")
     print(f"  实体数: {len(result.entities)}")
     print(f"  总风险评分: {result.total_risk_score} ({result.risk_level})")
     print(f"  结果已保存至: {output_path}")
@@ -45,9 +45,9 @@ def cmd_query(args):
     if args.question:
         print(f"查询中: {args.question}")
         result = engine.query(args.question, top_k=args.top_k)
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print(f"回答: {result.answer}")
-        print("="*50)
+        print("=" * 50)
         if result.sources:
             print("\n来源:")
             for src in result.sources:
@@ -59,12 +59,16 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="子命令")
 
     # Process subcommand
-    parser_process = subparsers.add_parser("process", help="PDF文本提取与分类")
+    subparsers.add_parser("process", help="PDF文本提取与分类")
 
     # Extract subcommand
     parser_extract = subparsers.add_parser("extract", help="风险实体提取")
-    parser_extract.add_argument("--input", type=str, default="docs/all_extracted.txt", help="输入文本路径")
-    parser_extract.add_argument("--output", type=str, default="docs/entities_extracted.json", help="输出JSON路径")
+    parser_extract.add_argument(
+        "--input", type=str, default="docs/all_extracted.txt", help="输入文本路径"
+    )
+    parser_extract.add_argument(
+        "--output", type=str, default="docs/entities_extracted.json", help="输出JSON路径"
+    )
 
     # Query subcommand
     parser_query = subparsers.add_parser("query", help="RAG问答查询")

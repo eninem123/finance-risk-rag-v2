@@ -1,12 +1,10 @@
 import logging
 import re
-import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from finance_risk_rag.config import get_config
 from finance_risk_rag.exceptions import ExtractionError, RuleLoadError
-from finance_risk_rag.llm import LLMClientWrapper
 from finance_risk_rag.models import Entity, ExtractionResult
 from finance_risk_rag.utils import (
     calculate_risk_level,
@@ -48,7 +46,7 @@ class RuleBasedExtractor:
 
             for keyword in keywords:
                 # 兼容 CJK 和 英文 边界
-                pattern = rf'{re.escape(keyword)}'
+                pattern = rf"{re.escape(keyword)}"
 
                 for match in re.finditer(pattern, text, re.IGNORECASE):
                     start = match.start()
@@ -62,14 +60,16 @@ class RuleBasedExtractor:
                     context_end = min(len(text), start + len(keyword) + 80)
                     context = text[context_start:context_end].replace("\n", " ").strip()
 
-                    entities.append(Entity(
-                        type=entity_type,
-                        text=keyword,
-                        risk_score=base_risk_score,
-                        confidence=1.0,
-                        context=context,
-                        source="rule"
-                    ))
+                    entities.append(
+                        Entity(
+                            type=entity_type,
+                            text=keyword,
+                            risk_score=base_risk_score,
+                            confidence=1.0,
+                            context=context,
+                            source="rule",
+                        )
+                    )
         return entities
 
 
@@ -77,15 +77,15 @@ class BERTExtractor:
     """基于BERT的实体提取器"""
 
     def __init__(self, model_path: Optional[Path] = None) -> None:
-        self._nlp = None
+        self._nlp: Any = None
         self._logger = logging.getLogger(__name__)
         if model_path:
             self.load_model(model_path)
 
     def load_model(self, model_path: Path) -> bool:
         try:
-            from transformers import pipeline, AutoModelForTokenClassification, AutoTokenizer
             import torch
+            from transformers import pipeline
 
             device = 0 if torch.cuda.is_available() else -1
             self._nlp = pipeline(
@@ -93,8 +93,8 @@ class BERTExtractor:
                 model=str(model_path),
                 tokenizer=str(model_path),
                 device=device,
-                aggregation_strategy="simple"
-            )
+                aggregation_strategy="simple",
+            )  # type: ignore[call-overload]
             self._logger.info(f"BERT模型加载成功: {model_path}")
             return True
         except Exception as e:
@@ -122,19 +122,21 @@ class BERTExtractor:
         entities = []
 
         for i in range(0, len(text), chunk_size):
-            chunk = text[i:i + chunk_size]
+            chunk = text[i : i + chunk_size]
             try:
                 results = self._nlp(chunk)
                 for res in results:
-                    entity_type = res['entity_group']
-                    entities.append(Entity(
-                        type=entity_type,
-                        text=res['word'],
-                        risk_score=risk_score_map.get(entity_type, 20),
-                        confidence=float(res['score']),
-                        context=chunk,
-                        source="bert"
-                    ))
+                    entity_type = res["entity_group"]
+                    entities.append(
+                        Entity(
+                            type=entity_type,
+                            text=res["word"],
+                            risk_score=risk_score_map.get(entity_type, 20),
+                            confidence=float(res["score"]),
+                            context=chunk,
+                            source="bert",
+                        )
+                    )
             except Exception as e:
                 self._logger.warning(f"BERT 分块提取失败: {e}")
 
@@ -162,7 +164,9 @@ class EntityExtractionPipeline:
 
     def __init__(self) -> None:
         self._config = get_config()
-        self._logger = setup_logger("entity_extraction", str(self._config.log_dir / "extract_entities.log"))
+        self._logger = setup_logger(
+            "entity_extraction", str(self._config.log_dir / "extract_entities.log")
+        )
         self._rule_extractor = RuleBasedExtractor()
         self._bert_extractor = BERTExtractor()
         self._merger = EntityMerger()
@@ -196,7 +200,7 @@ class EntityExtractionPipeline:
             entities=final_entities,
             total_risk_score=total_risk,
             risk_level=risk_level,
-            metadata={"rule_count": len(rule_entities), "bert_count": len(bert_entities)}
+            metadata={"rule_count": len(rule_entities), "bert_count": len(bert_entities)},
         )
 
     def save_result(self, result: ExtractionResult, output_path: Path) -> None:

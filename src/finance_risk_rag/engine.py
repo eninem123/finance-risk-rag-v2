@@ -1,12 +1,12 @@
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, cast
 
 import chromadb
 from chromadb.utils import embedding_functions as ef
 
 from finance_risk_rag.config import get_config
-from finance_risk_rag.exceptions import DatabaseError, EmbeddingError, RAGError
+from finance_risk_rag.exceptions import DatabaseError, EmbeddingError
 from finance_risk_rag.llm import LLMClientWrapper
 from finance_risk_rag.models import ChunkConfig, DocumentChunk, QueryResult
 from finance_risk_rag.utils import clean_text, ensure_dirs, split_text_by_sentence
@@ -35,9 +35,12 @@ class EmbeddingModelFactory:
     @staticmethod
     def _create_sentence_transformer_embedding() -> Callable[[List[str]], List[List[float]]]:
         from sentence_transformers import SentenceTransformer
+
         model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
         def embed(texts: List[str]) -> List[List[float]]:
             return model.encode(texts, show_progress_bar=False, convert_to_numpy=True).tolist()
+
         return embed
 
 
@@ -59,11 +62,15 @@ class TextChunker:
                 current = sentence
             else:
                 prev_sent = sentences[i - 1]
-                overlap_part = prev_sent[-self._config.overlap:] if len(prev_sent) >= self._config.overlap else prev_sent
+                overlap_part = (
+                    prev_sent[-self._config.overlap :]
+                    if len(prev_sent) >= self._config.overlap
+                    else prev_sent
+                )
                 current = overlap_part + sentence
 
             if len(current) > self._config.chunk_size:
-                current = current[:self._config.chunk_size]
+                current = current[: self._config.chunk_size]
             chunks.append(current)
         return chunks
 
@@ -74,15 +81,13 @@ class RAGDatabase:
     COLLECTION_NAME = "finance_docs"
 
     def __init__(
-        self,
-        db_path: Path,
-        embedding_fn: Optional[Callable[[List[str]], List[List[float]]]] = None
+        self, db_path: Path, embedding_fn: Optional[Callable[[List[str]], List[List[float]]]] = None
     ) -> None:
         ensure_dirs(db_path)
         self._db_path = str(db_path)
         self._embedding_fn = embedding_fn or EmbeddingModelFactory.create()
-        self._client: Optional[chromadb.Client] = None
-        self._collection: Optional[chromadb.Collection] = None
+        self._client: Optional[Any] = None
+        self._collection: Optional[Any] = None
         self._initialize()
 
     def _initialize(self) -> None:
@@ -93,27 +98,34 @@ class RAGDatabase:
             logger.error(f"数据库初始化失败: {e}")
             raise DatabaseError(f"无法初始化数据库: {e}") from e
 
-    def _get_or_create_collection(self) -> chromadb.Collection:
+    def _get_or_create_collection(self) -> Any:
+        if self._client is None:
+            raise DatabaseError("数据库客户端未初始化")
         try:
-            return self._client.get_collection(name=self.COLLECTION_NAME, embedding_function=self._embedding_fn)
+            return self._client.get_collection(
+                name=self.COLLECTION_NAME, embedding_function=self._embedding_fn
+            )
         except Exception:
             return self._client.create_collection(
-                name=self.COLLECTION_NAME,
-                embedding_function=self._embedding_fn
+                name=self.COLLECTION_NAME, embedding_function=self._embedding_fn
             )
 
     def add_documents(self, chunks: List[DocumentChunk], batch_size: int = 100) -> int:
-        if not chunks:
+        if not chunks or self._collection is None:
             return 0
         total_added = 0
         for i in range(0, len(chunks), batch_size):
-            batch = chunks[i:i + batch_size]
+            batch = chunks[i : i + batch_size]
             documents = [chunk.content for chunk in batch]
             ids = [f"{chunk.source}__{chunk.chunk_index}" for chunk in batch]
-            metadatas = [
-                {"source": chunk.source, "chunk_index": chunk.chunk_index, **chunk.metadata}
-                for chunk in batch
-            ]
+            # Use cast to satisfy mypy's expectation for Mapping[str, str | int | float | bool ...]
+            metadatas = cast(
+                List[Dict[str, Any]],
+                [
+                    {"source": chunk.source, "chunk_index": chunk.chunk_index, **chunk.metadata}
+                    for chunk in batch
+                ],
+            )
             try:
                 self._collection.add(documents=documents, metadatas=metadatas, ids=ids)
                 total_added += len(batch)
@@ -123,11 +135,13 @@ class RAGDatabase:
         return total_added
 
     def query(self, query_text: str, top_k: int = 4) -> List[Dict[str, Any]]:
+        if self._collection is None:
+            return []
         try:
             results = self._collection.query(query_texts=[query_text], n_results=top_k)
-            documents = results.get("documents", [[]])[0]
-            metadatas = results.get("metadatas", [[]])[0]
-            distances = results.get("distances", [[]])[0]
+            documents = cast(List[List[str]], results.get("documents", [[]]))[0]
+            metadatas = cast(List[List[Dict[str, Any]]], results.get("metadatas", [[]]))[0]
+            distances = cast(List[List[float]], results.get("distances", [[]]))[0]
             return [
                 {"content": doc, "metadata": meta, "distance": dist}
                 for doc, meta, dist in zip(documents, metadatas, distances)
@@ -137,6 +151,8 @@ class RAGDatabase:
             raise DatabaseError(f"查询失败: {e}") from e
 
     def clear(self) -> None:
+        if self._client is None:
+            return
         try:
             self._client.delete_collection(name=self.COLLECTION_NAME)
             self._collection = self._get_or_create_collection()
@@ -152,7 +168,7 @@ class RAGEngine:
         self,
         docs_dir: Optional[Path] = None,
         db_path: Optional[Path] = None,
-        chunk_config: Optional[ChunkConfig] = None
+        chunk_config: Optional[ChunkConfig] = None,
     ) -> None:
         config = get_config()
         self._docs_dir = docs_dir or config.docs_dir
@@ -198,5 +214,5 @@ class RAGEngine:
                 answer=f"无法生成回答: {e}",
                 sources=sources,
                 confidence=0.0,
-                metadata={"error": str(e)}
+                metadata={"error": str(e)},
             )

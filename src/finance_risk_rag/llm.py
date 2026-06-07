@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from finance_risk_rag.config import get_config
 from finance_risk_rag.exceptions import LLMError
@@ -21,7 +21,7 @@ class LLMClientWrapper:
         self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        model_name: Optional[str] = None
+        model_name: Optional[str] = None,
     ) -> None:
         """
         初始化LLM客户端
@@ -42,6 +42,7 @@ class LLMClientWrapper:
         """初始化OpenAI兼容客户端"""
         try:
             from openai import OpenAI
+
             self._client = OpenAI(api_key=self._api_key, base_url=self._base_url)
             logger.info(f"LLM客户端初始化成功，模型: {self._model_name}")
         except Exception as e:
@@ -59,7 +60,7 @@ class LLMClientWrapper:
         context: str,
         temperature: float = DEFAULT_TEMPERATURE,
         max_tokens: int = DEFAULT_MAX_TOKENS,
-        system_prompt: str = "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。"
+        system_prompt: str = "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。",
     ) -> str:
         """
         向LLM提问，带有重试逻辑
@@ -69,17 +70,23 @@ class LLMClientWrapper:
 
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}"}
+            {
+                "role": "user",
+                "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}",
+            },
         ]
 
         last_error = None
+        if self._client is None:
+            raise LLMError("LLM 客户端未初始化")
+
         for attempt in range(self.MAX_RETRIES):
             try:
                 response = self._client.chat.completions.create(
                     model=self._model_name,
                     messages=messages,
                     temperature=temperature,
-                    max_tokens=max_tokens
+                    max_tokens=max_tokens,
                 )
                 return response.choices[0].message.content
             except Exception as e:
