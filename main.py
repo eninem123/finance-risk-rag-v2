@@ -9,16 +9,13 @@ from pathlib import Path
 # 将 src 目录添加到 Python 路径
 sys.path.append(str(Path(__file__).parent / "src"))
 
-from finance_risk_rag.config import get_config
-from finance_risk_rag.extract_text import DocumentProcessor
-from finance_risk_rag.extract_entities import EntityExtractionPipeline
-from finance_risk_rag.rag_core import RAGEngine
+from finance_risk_rag.extract_entities import EntityExtractionPipeline  # noqa: E402
+from finance_risk_rag.extract_text import DocumentProcessor  # noqa: E402
+from finance_risk_rag.rag_core import RAGEngine  # noqa: E402
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Finance-Risk-RAG: 银行级多语言财务文本风控AI系统"
-    )
+    parser = argparse.ArgumentParser(description="Finance-Risk-RAG: 银行级多语言财务文本风控AI系统")
     subparsers = parser.add_subparsers(dest="command", help="子命令")
 
     # process 子命令
@@ -27,8 +24,12 @@ def main():
 
     # extract 子命令
     extract_parser = subparsers.add_parser("extract", help="风险实体抽取")
-    extract_parser.add_argument("--input", type=str, default="docs/all_extracted.txt", help="输入文本文件")
-    extract_parser.add_argument("--output", type=str, default="docs/entities_extracted.json", help="输出 JSON 文件")
+    extract_parser.add_argument(
+        "--input", type=str, default="docs/all_extracted.txt", help="输入文本文件"
+    )
+    extract_parser.add_argument(
+        "--output", type=str, default="docs/entities_extracted.json", help="输出 JSON 文件"
+    )
     extract_parser.add_argument("--no-qa", action="store_true", help="禁用交互式问答")
 
     # query 子命令
@@ -49,7 +50,7 @@ def main():
         result = pipeline.process(Path(args.input))
         pipeline.save_result(result, Path(args.output))
 
-        print(f"\n实体提取完成！")
+        print("\n实体提取完成！")
         print(f"  实体数: {len(result.entities)}")
         print(f"  总风险: {result.total_risk_score} ({result.risk_level})")
 

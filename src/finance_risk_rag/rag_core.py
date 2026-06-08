@@ -2,29 +2,30 @@
 Finance-Risk-RAG RAG 核心引擎
 """
 
-import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Callable
+from typing import Dict
 
 import chromadb
 from chromadb.utils import embedding_functions as ef
 from openai import OpenAI
 
 from finance_risk_rag.config import get_config
-from finance_risk_rag.models import ChunkConfig, QueryResult, DocumentChunk
-from finance_risk_rag.utils import clean_text, split_text_by_sentence, setup_logger, ensure_dirs
+from finance_risk_rag.models import QueryResult
+from finance_risk_rag.utils import (
+    clean_text,
+    ensure_dirs,
+    setup_logger,
+    split_text_by_sentence,
+)
 
 
 class LLMClientWrapper:
     """LLM 客户端封装"""
+
     def __init__(self, config=None):
         self.config = config or get_config()
         self.client = None
         if self.config.llm_api_key:
-            self.client = OpenAI(
-                api_key=self.config.llm_api_key,
-                base_url=self.config.llm_base_url
-            )
+            self.client = OpenAI(api_key=self.config.llm_api_key, base_url=self.config.llm_base_url)
 
     def ask(self, query: str, context: str) -> str:
         if not self.client:
@@ -33,14 +34,15 @@ class LLMClientWrapper:
         system_prompt = "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。"
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}"}
+            {
+                "role": "user",
+                "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}",
+            },
         ]
 
         try:
             response = self.client.chat.completions.create(
-                model=self.config.llm_model_name,
-                messages=messages,
-                temperature=0.0
+                model=self.config.llm_model_name, messages=messages, temperature=0.0
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -63,8 +65,7 @@ class RAGEngine:
         self.emb_fn = ef.ONNXMiniLM_L6_V2()
 
         self.collection = self.db_client.get_or_create_collection(
-            name="finance_docs",
-            embedding_function=self.emb_fn
+            name="finance_docs", embedding_function=self.emb_fn
         )
 
     def build_index(self) -> Dict[str, int]:
@@ -90,11 +91,7 @@ class RAGEngine:
                 ids.append(f"{txt_file.name}_{i}")
 
             if documents:
-                self.collection.upsert(
-                    documents=documents,
-                    metadatas=metadatas,
-                    ids=ids
-                )
+                self.collection.upsert(documents=documents, metadatas=metadatas, ids=ids)
                 stats["files_processed"] += 1
                 stats["chunks_added"] += len(documents)
 
@@ -102,10 +99,7 @@ class RAGEngine:
 
     def query(self, question: str, top_k: int = 4) -> QueryResult:
         """执行查询"""
-        results = self.collection.query(
-            query_texts=[question],
-            n_results=top_k
-        )
+        results = self.collection.query(query_texts=[question], n_results=top_k)
 
         docs = results.get("documents", [[]])[0]
         metas = results.get("metadatas", [[]])[0]
@@ -113,8 +107,4 @@ class RAGEngine:
         context = "\n\n".join(docs)
         answer = self.llm.ask(question, context)
 
-        return QueryResult(
-            answer=answer,
-            sources=metas,
-            confidence=1.0
-        )
+        return QueryResult(answer=answer, sources=metas, confidence=1.0)

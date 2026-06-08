@@ -1,6 +1,7 @@
 import unittest
-from pathlib import Path
+
 from finance_risk_rag.config import get_config
+
 
 class TestConfig(unittest.TestCase):
     def test_singleton_config(self):
@@ -13,5 +14,6 @@ class TestConfig(unittest.TestCase):
         self.assertTrue(config.base_dir.is_absolute())
         self.assertEqual(config.docs_dir.name, "docs")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

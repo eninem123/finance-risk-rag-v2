@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
     - uses: actions/checkout@v3
@@ -25,20 +25,19 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 black isort mypy
-        pip install -r requirements.txt
+        pip install flake8 black isort mypy pytest
+        pip install -e .
 
     - name: Lint with flake8
       run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+        flake8 . --count --show-source --statistics
 
     - name: Format check with black
       run: |
@@ -51,6 +50,11 @@ jobs:
     - name: Type check with mypy
       run: |
         mypy --ignore-missing-imports .
+
+    - name: Run tests with pytest
+      run: |
+        export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+        pytest tests/
 
   code-quality:
     runs-on: ubuntu-latest
@@ -72,15 +76,10 @@ jobs:
         black --check --line-length=100 .
         isort --check-only --profile black .
 
-  security:
+  security-checks:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-
-    - name: Run security scan
-      uses: securecodewarrior/github-action-add-sarif@v1
-      with:
-        sarif-file: 'security-scan.sarif'
 
     - name: Check for secrets
       uses: trufflesecurity/trufflehog@main
