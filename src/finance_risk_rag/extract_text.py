@@ -39,10 +39,10 @@ class DocumentProcessor:
         """图像预处理优化"""
         image = image.convert("L")
         image = image.filter(ImageFilter.MedianFilter(size=3))
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(1.2)
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(2.5)
+        brightness = ImageEnhance.Brightness(image)
+        image = brightness.enhance(1.2)
+        contrast = ImageEnhance.Contrast(image)
+        image = contrast.enhance(2.5)
         image = image.filter(ImageFilter.SHARPEN)
         image = image.point(lambda x: 0 if x < 140 else 255, "1")
         return image

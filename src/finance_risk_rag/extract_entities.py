@@ -4,7 +4,7 @@ Finance-Risk-RAG 实体提取模块
 
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from openai import OpenAI
 
@@ -59,7 +59,7 @@ class BERTExtractor:
     """基于 BERT 的实体提取器"""
 
     def __init__(self, model_path: Optional[Path] = None):
-        self.pipeline = None
+        self.pipeline: Any = None
         self.logger = setup_logger("bert_extractor")
         if model_path and model_path.exists():
             self.load_model(model_path)
@@ -107,6 +107,8 @@ class BERTExtractor:
         chunks = self._chunk_text(text)
         for chunk in chunks:
             try:
+                if self.pipeline is None:
+                    continue
                 results = self.pipeline(chunk)
                 for res in results:
                     ent_type = res.get("entity_group", "UNKNOWN")
@@ -162,7 +164,7 @@ class EntityExtractionPipeline:
             bert_entities = self.bert_extractor.extract(text)
 
         # 融合与去重
-        merged = {}
+        merged: Dict[Tuple[str, str], Entity] = {}
         for e in rule_entities + bert_entities:
             key = (e.text, e.type)
             if key not in merged or e.confidence > merged[key].confidence:
