@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finance_risk_rag"
+version = "2.0.0"
+description = "Bank-level multi-language financial text risk control AI system"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "jieba>=0.42.1",
+    "regex>=2023.0.0",
+    "pdfplumber>=0.10.0",
+    "pytesseract>=0.3.10",
+    "Pillow>=10.0.0",
+    "chromadb>=0.4.15",
+    "sentence-transformers>=2.2.0",
+    "onnxruntime>=1.15.0",
+    "openai>=1.0.0",
+    "numpy>=1.24.0",
+    "scikit-learn>=1.3.0",
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "streamlit>=1.28.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+finance-risk-rag = "main:main"
