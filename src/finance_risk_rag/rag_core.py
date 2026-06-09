@@ -63,7 +63,13 @@ class EmbeddingModelFactory:
         try:
             emb_fn = ef.ONNXMiniLM_L6_V2(preferred_providers=["CPUExecutionProvider"])
             logger.info("使用 ONNXMiniLM_L6_V2 作为嵌入函数")
-            return emb_fn
+
+            def embed(texts: List[str]) -> List[List[float]]:
+                # ONNXMiniLM_L6_V2 returns a list of numpy arrays, but we need List[List[float]]
+                results = emb_fn(texts)
+                return [arr.tolist() for arr in results]
+
+            return embed
         except Exception as e:
             logger.warning(f"ONNXMiniLM_L6_V2 不可用: {e}")
             raise
@@ -129,7 +135,7 @@ class LLMClientWrapper:
         """
         向LLM提问
         """
-        if not self.is_available:
+        if self._client is None:
             raise LLMError("LLM客户端未初始化，请设置API密钥")
 
         system_prompt = "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。"
@@ -148,7 +154,7 @@ class LLMClientWrapper:
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
-            return response.choices[0].message.content
+            return str(response.choices[0].message.content)
         except Exception as e:
             logger.error(f"LLM调用失败: {e}")
             raise LLMError(f"LLM调用失败: {e}") from e
@@ -207,7 +213,7 @@ class RAGDatabase:
         ensure_dirs(self.config.chroma_db_dir)
 
         self._embedding_fn = embedding_fn or EmbeddingModelFactory.create()
-        self._client: Optional[chromadb.Client] = None
+        self._client: Optional[chromadb.ClientAPI] = None
         self._collection: Optional[chromadb.Collection] = None
 
         self._initialize()
@@ -224,20 +230,23 @@ class RAGDatabase:
 
     def _get_or_create_collection(self) -> chromadb.Collection:
         """获取或创建集合"""
+        if self._client is None:
+            raise DatabaseError("数据库客户端未初始化")
+
         try:
             return self._client.get_collection(
-                name=self.COLLECTION_NAME, embedding_function=self._embedding_fn
+                name=self.COLLECTION_NAME, embedding_function=self._embedding_fn  # type: ignore
             )
         except Exception:
             return self._client.create_collection(
-                name=self.COLLECTION_NAME, embedding_function=self._embedding_fn
+                name=self.COLLECTION_NAME, embedding_function=self._embedding_fn  # type: ignore
             )
 
     def add_documents(self, chunks: List[DocumentChunk], batch_size: int = 100) -> int:
         """
         添加文档到数据库
         """
-        if not chunks:
+        if not chunks or self._collection is None:
             return 0
 
         total_added = 0
@@ -252,7 +261,11 @@ class RAGDatabase:
             ]
 
             try:
-                self._collection.add(documents=documents, metadatas=metadatas, ids=ids)
+                # Type cast for chromadb metadata compatibility
+                from typing import Dict, cast
+
+                typed_metadatas = cast(Any, metadatas)
+                self._collection.add(documents=documents, metadatas=typed_metadatas, ids=ids)
                 total_added += len(batch)
             except Exception as e:
                 logger.error(f"添加文档失败: {e}")
@@ -264,16 +277,23 @@ class RAGDatabase:
         """
         查询相似文档
         """
+        if self._collection is None:
+            return []
+
         try:
             results = self._collection.query(query_texts=[query_text], n_results=top_k)
 
-            documents = results.get("documents", [[]])[0]
-            metadatas = results.get("metadatas", [[]])[0]
-            distances = results.get("distances", [[]])[0]
+            documents = results.get("documents") or [[]]
+            metadatas = results.get("metadatas") or [[]]
+            distances = results.get("distances") or [[]]
+
+            docs = documents[0]
+            metas = metadatas[0]
+            dists = distances[0]
 
             return [
-                {"content": doc, "metadata": meta, "distance": dist}
-                for doc, meta, dist in zip(documents, metadatas, distances)
+                {"content": str(doc), "metadata": dict(meta), "distance": float(dist)}
+                for doc, meta, dist in zip(docs, metas, dists)
             ]
         except Exception as e:
             logger.error(f"查询失败: {e}")

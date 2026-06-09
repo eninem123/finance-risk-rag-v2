@@ -116,11 +116,11 @@ class DocumentProcessor:
         # 中值滤波去噪
         image = image.filter(ImageFilter.MedianFilter(size=3))
         # 增强亮度
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(1.2)
+        bright_enhancer = ImageEnhance.Brightness(image)
+        image = bright_enhancer.enhance(1.2)
         # 增强对比度
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(2.5)
+        contrast_enhancer = ImageEnhance.Contrast(image)
+        image = contrast_enhancer.enhance(2.5)
         # 锐化
         image = image.filter(ImageFilter.SHARPEN)
         # 二值化

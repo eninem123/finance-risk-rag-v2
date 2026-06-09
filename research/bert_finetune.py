@@ -8,7 +8,6 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from transformers import (
     BertForTokenClassification,
-    BertTokenizerFast,
     get_linear_schedule_with_warmup,
 )
 from utils import clean_text, ensure_dirs, setup_logger
@@ -125,6 +124,8 @@ class NERDataset(Dataset):
 
 # ====================== 模型 =======================
 def init_model_tokenizer():
+    from transformers import BertTokenizerFast
+
     tokenizer = BertTokenizerFast.from_pretrained(config.model_name)
     model = BertForTokenClassification.from_pretrained(
         config.model_name,

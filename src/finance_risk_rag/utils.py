@@ -20,7 +20,7 @@ import re
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, Union
 
 import jieba
 
@@ -491,7 +491,9 @@ def normalize_risk_scores(scores: List[float]) -> List[float]:
     return [(s - min_score) / (max_score - min_score) * 100 for s in scores]
 
 
-def calculate_risk_trend(historical_scores: List[float], window_size: int = 3) -> Dict[str, Any]:
+def calculate_risk_trend(
+    historical_scores: Sequence[float], window_size: int = 3
+) -> Dict[str, Any]:
     """
     计算风险趋势
 
@@ -625,7 +627,7 @@ if __name__ == "__main__":
     print(f"  95分 -> {calculate_risk_level(95)}")
 
     print("\n风险趋势分析:")
-    scores = [30, 35, 42, 50, 58, 65]
+    scores: List[float] = [30.0, 35.0, 42.0, 50.0, 58.0, 65.0]
     trend = calculate_risk_trend(scores)
     print(f"  历史分数: {scores}")
     print(f"  趋势: {trend}")

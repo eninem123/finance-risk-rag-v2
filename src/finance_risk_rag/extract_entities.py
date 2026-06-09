@@ -122,7 +122,7 @@ class BERTExtractor:
         Args:
             model_path: 模型路径
         """
-        self._pipeline = None
+        self._pipeline: Any = None
         self._logger = logging.getLogger(__name__)
 
         if model_path:
@@ -203,7 +203,7 @@ class BERTExtractor:
         if self._pipeline is None:
             return []
 
-        results = self._pipeline(chunk)
+        results: List[Dict[str, Any]] = self._pipeline(chunk)
         entities = []
 
         for res in results:
