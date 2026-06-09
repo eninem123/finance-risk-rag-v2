@@ -1,6 +1,8 @@
-from unittest.mock import MagicMock, patch
-from finance_risk_rag.rag_core import TextChunker, LLMClientWrapper
+from unittest.mock import patch
+
 from finance_risk_rag.models import ChunkConfig
+from finance_risk_rag.rag_core import LLMClientWrapper, TextChunker
+
 
 def test_text_chunker():
     config = ChunkConfig(chunk_size=50, overlap=10)
@@ -11,6 +13,7 @@ def test_text_chunker():
     for chunk in chunks:
         assert len(chunk) <= 50
 
+
 @patch("openai.OpenAI")
 def test_llm_client_wrapper(mock_openai):
     mock_instance = mock_openai.return_value
@@ -19,6 +22,7 @@ def test_llm_client_wrapper(mock_openai):
     # 设置 API KEY 避开初始化警告
     with patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}):
         from finance_risk_rag.config import Config
+
         config = Config()
         client = LLMClientWrapper(config)
         answer = client.ask("问题", "上下文")

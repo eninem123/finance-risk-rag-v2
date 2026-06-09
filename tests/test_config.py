@@ -1,5 +1,7 @@
 import os
+
 from finance_risk_rag.config import Config
+
 
 def test_config_env_override():
     os.environ["LLM_MODEL_NAME"] = "test-model"
@@ -12,6 +14,7 @@ def test_config_env_override():
     # Cleanup
     del os.environ["LLM_MODEL_NAME"]
     del os.environ["CHUNK_SIZE"]
+
 
 def test_config_paths(tmp_path):
     config = Config(base_dir=tmp_path)

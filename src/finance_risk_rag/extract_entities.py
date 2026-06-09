@@ -5,15 +5,10 @@ Finance-Risk-RAG 实体提取模块
 从财务文档中提取风险实体，支持规则提取和BERT模型提取。
 """
 
-import json
 import logging
 import re
-import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
-
-from openai import OpenAI
 
 from .config import get_config
 from .exceptions import ExtractionError, RuleLoadError
@@ -26,8 +21,8 @@ from .utils import (
     setup_logger,
 )
 
-
 # ==================== 规则实体提取器 ====================
+
 
 class RuleBasedExtractor:
     """基于规则的实体提取器"""
@@ -82,7 +77,7 @@ class RuleBasedExtractor:
 
             for keyword in keywords:
                 # 优化正则：支持中英文边界
-                pattern = rf'(?:^|(?<=[^\w]))({re.escape(keyword)})(?:(?=[^\w])|$)'
+                pattern = rf"(?:^|(?<=[^\w]))({re.escape(keyword)})(?:(?=[^\w])|$)"
 
                 for match in re.finditer(pattern, text, re.IGNORECASE):
                     start = match.start(1)
@@ -97,31 +92,28 @@ class RuleBasedExtractor:
                     context_end = min(len(text), start + len(keyword) + 80)
                     context = text[context_start:context_end].replace("\n", " ").strip()
 
-                    entities.append(Entity(
-                        type=entity_type,
-                        text=keyword,
-                        risk_score=base_risk_score,
-                        confidence=1.0,
-                        context=context,
-                        source="rule"
-                    ))
+                    entities.append(
+                        Entity(
+                            type=entity_type,
+                            text=keyword,
+                            risk_score=base_risk_score,
+                            confidence=1.0,
+                            context=context,
+                            source="rule",
+                        )
+                    )
 
         return entities
 
 
 # ==================== BERT 实体提取器 ====================
 
+
 class BERTExtractor:
     """基于BERT的实体提取器"""
 
     # 风险评分映射
-    RISK_SCORE_MAP = {
-        "RISK": 30,
-        "MONEY": 25,
-        "ORG": 15,
-        "PER": 5,
-        "LOC": 5
-    }
+    RISK_SCORE_MAP = {"RISK": 30, "MONEY": 25, "ORG": 15, "PER": 5, "LOC": 5}
 
     def __init__(self, model_path: Optional[Path] = None) -> None:
         """
@@ -150,7 +142,7 @@ class BERTExtractor:
                 "token-classification",
                 model=str(model_path),
                 tokenizer=str(model_path),
-                aggregation_strategy="simple"
+                aggregation_strategy="simple",
             )
 
             self._logger.info(f"BERT模型加载成功: {model_path}")
@@ -164,12 +156,7 @@ class BERTExtractor:
         """检查模型是否可用"""
         return self._pipeline is not None
 
-    def extract(
-        self,
-        text: str,
-        max_length: int = 512,
-        overlap: int = 50
-    ) -> List[Entity]:
+    def extract(self, text: str, max_length: int = 512, overlap: int = 50) -> List[Entity]:
         """
         使用BERT提取实体
 
@@ -235,28 +222,27 @@ class BERTExtractor:
             context_end = min(len(chunk), start + len(word) + 40)
             context = chunk[context_start:context_end].strip()
 
-            entities.append(Entity(
-                type=entity_group,
-                text=word,
-                risk_score=risk_score,
-                confidence=score,
-                context=context,
-                source="bert"
-            ))
+            entities.append(
+                Entity(
+                    type=entity_group,
+                    text=word,
+                    risk_score=risk_score,
+                    confidence=score,
+                    context=context,
+                    source="bert",
+                )
+            )
 
         return entities
 
 
 # ==================== 实体融合器 ====================
 
+
 class EntityMerger:
     """实体融合器"""
 
-    def merge(
-        self,
-        rule_entities: List[Entity],
-        bert_entities: List[Entity]
-    ) -> List[Entity]:
+    def merge(self, rule_entities: List[Entity], bert_entities: List[Entity]) -> List[Entity]:
         """
         融合规则提取和BERT提取的实体
         """
@@ -280,12 +266,15 @@ class EntityMerger:
 
 # ==================== 实体提取管道 ====================
 
+
 class EntityExtractionPipeline:
     """实体提取管道"""
 
     def __init__(self, config=None) -> None:
         self._config = config or get_config()
-        self._logger = setup_logger("entity_extraction", self.config.log_dir / "extract_entities.log")
+        self._logger = setup_logger(
+            "entity_extraction", self.config.log_dir / "extract_entities.log"
+        )
 
         self._rule_extractor = RuleBasedExtractor()
         self._bert_extractor = BERTExtractor()
@@ -341,8 +330,8 @@ class EntityExtractionPipeline:
             risk_level=risk_level,
             metadata={
                 "rule_entities_count": len(rule_entities),
-                "bert_entities_count": len(bert_entities)
-            }
+                "bert_entities_count": len(bert_entities),
+            },
         )
 
     def save_result(self, result: ExtractionResult, output_path: Path) -> None:

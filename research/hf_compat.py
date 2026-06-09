@@ -1,7 +1,9 @@
 # hf_compat.py → 替换为以下内容
 import os
+
 from huggingface_hub import snapshot_download
 from huggingface_hub.utils import EntryNotFoundError
+
 
 def cached_download(*args, **kwargs):
     """
@@ -36,7 +38,7 @@ def cached_download(*args, **kwargs):
             allow_patterns=[filename] if filename else None,
             cache_dir=cache_dir,
             revision=revision,
-            local_files_only=local_files_only
+            local_files_only=local_files_only,
         )
     except Exception as e:
         raise EntryNotFoundError(f"Could not download {repo_id}/{filename}: {e}")
