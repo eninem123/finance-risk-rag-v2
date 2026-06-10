@@ -6,10 +6,10 @@ import torch
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from transformers import get_linear_schedule_with_warmup  # 正确名称
 from transformers import (
     BertForTokenClassification,
     BertTokenizerFast,
+    get_linear_schedule_with_warmup,
 )
 from utils import clean_text, ensure_dirs, setup_logger
 
