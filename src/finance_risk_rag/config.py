@@ -1,0 +1,105 @@
+"""
+Finance-Risk-RAG 配置模块
+"""
+
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+
+@dataclass
+class Config:
+    """
+    系统配置类
+    """
+
+    # ==================== 路径配置 ====================
+    base_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
+    bert_local_path: Optional[Path] = None
+    chroma_db_dir: Path = field(default_factory=lambda: Path("rag_db"))
+    cache_dir: Path = field(default_factory=lambda: Path("cache"))
+    log_dir: Path = field(default_factory=lambda: Path("logs"))
+    docs_dir: Path = field(default_factory=lambda: Path("docs"))
+    knowledge_base_dir: Path = field(default_factory=lambda: Path("knowledge_base"))
+
+    # ==================== LLM 配置 ====================
+    llm_provider: str = "moonshot"
+    llm_api_key: Optional[str] = None
+    llm_base_url: str = "https://api.moonshot.cn/v1"
+    llm_model_name: str = "moonshot-v1-8k"
+    max_context_tokens: int = 2000
+
+    # ==================== 嵌入模型配置 ====================
+    embedding_backend: str = "onnx"
+
+    # ==================== OCR 配置 ====================
+    tesseract_cmd: Optional[str] = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    ocr_languages: str = "chi_tra+chi_sim+eng"
+    ocr_dpi: int = 600
+    ocr_version: str = "v7"
+
+    # ==================== 风险评估配置 ====================
+    risk_level_low: int = 30
+    risk_level_medium: int = 60
+    risk_level_high: int = 90
+
+    # ==================== 处理配置 ====================
+    chunk_size: int = 800
+    chunk_overlap: int = 100
+    batch_size: int = 100
+    api_call_interval: float = 1.0
+
+    def __post_init__(self) -> None:
+        self._load_from_env()
+        self._resolve_paths()
+
+    def _load_from_env(self) -> None:
+        self.llm_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("MOONSHOT_API_KEY")
+        self.llm_provider = os.getenv("LLM_PROVIDER", self.llm_provider)
+        self.llm_base_url = os.getenv("LLM_BASE_URL", self.llm_base_url)
+        self.llm_model_name = os.getenv("LLM_MODEL_NAME", self.llm_model_name)
+
+        env_tesseract = os.getenv("TESSERACT_CMD")
+        if env_tesseract:
+            self.tesseract_cmd = env_tesseract
+
+    def _resolve_paths(self) -> None:
+        for attr in ["chroma_db_dir", "cache_dir", "log_dir", "docs_dir", "knowledge_base_dir"]:
+            path = getattr(self, attr)
+            if not path.is_absolute():
+                setattr(self, attr, self.base_dir / path)
+
+        bert_path = self.base_dir / "hfl" / "chinese-bert-wwm-ext"
+        if bert_path.exists():
+            self.bert_local_path = bert_path
+
+    @property
+    def risk_entities_path(self) -> Path:
+        return self.knowledge_base_dir / "risk_entities.json"
+
+    @property
+    def stopwords_path(self) -> Path:
+        return self.knowledge_base_dir / "stopwords.txt"
+
+    @property
+    def finance_dict_path(self) -> Path:
+        return self.knowledge_base_dir / "finance_dict.txt"
+
+    def ensure_directories(self) -> None:
+        for dir_path in [self.chroma_db_dir, self.cache_dir, self.log_dir, self.docs_dir, self.knowledge_base_dir]:
+            dir_path.mkdir(parents=True, exist_ok=True)
+
+    def validate(self) -> bool:
+        if not self.llm_api_key:
+            print("警告: 未设置 LLM API 密钥")
+        return True
+
+
+_config: Optional[Config] = None
+
+def get_config() -> Config:
+    global _config
+    if _config is None:
+        _config = Config()
+    return _config
