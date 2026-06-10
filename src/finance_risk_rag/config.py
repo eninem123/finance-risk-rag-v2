@@ -34,7 +34,7 @@ class Config:
     embedding_backend: str = "onnx"
 
     # ==================== OCR 配置 ====================
-    tesseract_cmd: Optional[str] = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    tesseract_cmd: Optional[str] = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     ocr_languages: str = "chi_tra+chi_sim+eng"
     ocr_dpi: int = 600
     ocr_version: str = "v7"
@@ -87,7 +87,13 @@ class Config:
         return self.knowledge_base_dir / "finance_dict.txt"
 
     def ensure_directories(self) -> None:
-        for dir_path in [self.chroma_db_dir, self.cache_dir, self.log_dir, self.docs_dir, self.knowledge_base_dir]:
+        for dir_path in [
+            self.chroma_db_dir,
+            self.cache_dir,
+            self.log_dir,
+            self.docs_dir,
+            self.knowledge_base_dir,
+        ]:
             dir_path.mkdir(parents=True, exist_ok=True)
 
     def validate(self) -> bool:
@@ -97,6 +103,7 @@ class Config:
 
 
 _config: Optional[Config] = None
+
 
 def get_config() -> Config:
     global _config

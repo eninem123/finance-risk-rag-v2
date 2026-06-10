@@ -2,20 +2,17 @@
 Finance-Risk-RAG 实体提取模块
 """
 
-import logging
 import re
-import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from finance_risk_rag.config import get_config
+from finance_risk_rag.exceptions import ExtractionError, RuleLoadError
 from finance_risk_rag.models import Entity, ExtractionResult
-from finance_risk_rag.exceptions import RuleLoadError, ExtractionError
 from finance_risk_rag.utils import (
-    clean_text,
     calculate_risk_level,
+    clean_text,
     load_json_file,
-    save_json_file,
     setup_logger,
 )
 
@@ -47,14 +44,16 @@ class RuleBasedExtractor:
                     context_start = max(0, start - 80)
                     context_end = min(len(text), start + len(keyword) + 80)
                     context = text[context_start:context_end].replace("\n", " ").strip()
-                    entities.append(Entity(
-                        type=entity_type,
-                        text=keyword,
-                        risk_score=base_risk_score,
-                        confidence=1.0,
-                        context=context,
-                        source="rule"
-                    ))
+                    entities.append(
+                        Entity(
+                            type=entity_type,
+                            text=keyword,
+                            risk_score=base_risk_score,
+                            confidence=1.0,
+                            context=context,
+                            source="rule",
+                        )
+                    )
         return entities
 
 
@@ -67,11 +66,12 @@ class BERTExtractor:
 
     def load_model(self, model_path: Path) -> bool:
         try:
-            import torch
             from transformers import AutoModelForTokenClassification, AutoTokenizer
+
             self._tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self._model = AutoModelForTokenClassification.from_pretrained(str(model_path))
-            self._model.eval()
+            if self._model is not None:
+                self._model.eval()
             return True
         except Exception:
             return False
@@ -118,11 +118,13 @@ class EntityExtractionPipeline:
             raise ExtractionError(f"文件不存在: {text_path}")
         text = clean_text(text_path.read_text(encoding="utf-8"))
         rule_entities = self._rule_extractor.extract(text)
-        bert_entities = self._bert_extractor.extract(text) if self._bert_extractor.is_available else []
+        bert_entities = (
+            self._bert_extractor.extract(text) if self._bert_extractor.is_available else []
+        )
         final_entities = self._merger.merge(rule_entities, bert_entities)
         total_risk = sum(e.risk_score for e in final_entities)
         return ExtractionResult(
             entities=final_entities,
             total_risk_score=total_risk,
-            risk_level=calculate_risk_level(total_risk)
+            risk_level=calculate_risk_level(total_risk),
         )

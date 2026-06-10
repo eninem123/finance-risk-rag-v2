@@ -50,7 +50,8 @@ jobs:
 
     - name: Type check with mypy
       run: |
-        mypy --ignore-missing-imports .
+        export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+        mypy --ignore-missing-imports src/ main.py tests/
 
   code-quality:
     runs-on: ubuntu-latest
@@ -77,10 +78,16 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Run security scan
-      uses: securecodewarrior/github-action-add-sarif@v1
+    - name: Run bandit security scan
+      run: |
+        pip install bandit
+        bandit -r src/ -f sarif -o security-scan.sarif || true
+
+    - name: Upload Bandit Scan Results
+      uses: actions/upload-artifact@v3
       with:
-        sarif-file: 'security-scan.sarif'
+        name: bandit-scan
+        path: security-scan.sarif
 
     - name: Check for secrets
       uses: trufflesecurity/trufflehog@main

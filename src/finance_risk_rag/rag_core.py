@@ -2,7 +2,6 @@
 Finance-Risk-RAG RAG核心引擎
 """
 
-import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -11,13 +10,18 @@ from chromadb.utils import embedding_functions as ef
 from openai import OpenAI
 
 from finance_risk_rag.config import get_config
-from finance_risk_rag.models import ChunkConfig, QueryResult, DocumentChunk
-from finance_risk_rag.exceptions import RAGError, LLMError, DatabaseError
-from finance_risk_rag.utils import clean_text, ensure_dirs, split_text_by_sentence
+from finance_risk_rag.exceptions import LLMError
+from finance_risk_rag.models import DocumentChunk, QueryResult
+from finance_risk_rag.utils import split_text_by_sentence
 
 
 class LLMClientWrapper:
-    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None, model_name: str = "moonshot-v1-8k") -> None:
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        model_name: str = "moonshot-v1-8k",
+    ) -> None:
         config = get_config()
         self._api_key = api_key or config.llm_api_key
         self._base_url = base_url or config.llm_base_url
@@ -31,13 +35,11 @@ class LLMClientWrapper:
             raise LLMError("LLM客户端未初始化")
         messages = [
             {"role": "system", "content": "你是一名金融风险分析顾问。"},
-            {"role": "user", "content": f"参考上下文回答问题：\n\n{context}\n\n问题：{query}"}
+            {"role": "user", "content": f"参考上下文回答问题：\n\n{context}\n\n问题：{query}"},
         ]
         try:
             response = self._client.chat.completions.create(
-                model=self._model_name,
-                messages=messages,
-                temperature=0.0
+                model=self._model_name, messages=messages, temperature=0.0
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -50,12 +52,12 @@ class RAGDatabase:
         self._embedding_fn = embedding_fn or ef.ONNXMiniLM_L6_V2()
         self._client = chromadb.PersistentClient(path=str(db_path))
         self._collection = self._client.get_or_create_collection(
-            name="finance_docs",
-            embedding_function=self._embedding_fn
+            name="finance_docs", embedding_function=self._embedding_fn
         )
 
     def add_documents(self, chunks: List[DocumentChunk]) -> int:
-        if not chunks: return 0
+        if not chunks:
+            return 0
         documents = [c.content for c in chunks]
         metadatas = [{"source": c.source, "index": c.chunk_index} for c in chunks]
         ids = [f"{c.source}_{c.chunk_index}" for c in chunks]
@@ -78,10 +80,14 @@ class RAGEngine:
     def build_index(self) -> Dict[str, int]:
         stats = {"files": 0, "chunks": 0}
         for txt_file in self._config.docs_dir.glob("*.txt"):
-            if txt_file.name == "all_extracted.txt": continue
+            if txt_file.name == "all_extracted.txt":
+                continue
             content = txt_file.read_text(encoding="utf-8")
             text_chunks = split_text_by_sentence(content, max_len=self._config.chunk_size)
-            chunks = [DocumentChunk(content=c, source=txt_file.name, chunk_index=i) for i, c in enumerate(text_chunks)]
+            chunks = [
+                DocumentChunk(content=c, source=txt_file.name, chunk_index=i)
+                for i, c in enumerate(text_chunks)
+            ]
             self._db.add_documents(chunks)
             stats["files"] += 1
             stats["chunks"] += len(chunks)

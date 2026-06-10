@@ -2,8 +2,6 @@
 Finance-Risk-RAG 配置模块单元测试
 """
 
-import os
-from pathlib import Path
 from finance_risk_rag.config import Config, get_config
 
 

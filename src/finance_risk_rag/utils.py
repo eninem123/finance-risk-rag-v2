@@ -5,16 +5,11 @@ Finance-Risk-RAG 工具模块
 import hashlib
 import json
 import logging
-import os
 import re
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
-
-import jieba
-
-from finance_risk_rag.exceptions import FileOperationError
+from typing import Any, List, Optional, Union
 
 PathLike = Union[str, Path]
 
@@ -25,7 +20,9 @@ def ensure_dirs(*dirs: PathLike) -> None:
         path.mkdir(parents=True, exist_ok=True)
 
 
-def safe_delete_directory(dir_path: PathLike, max_retries: int = 5, retry_delay: float = 2.0) -> bool:
+def safe_delete_directory(
+    dir_path: PathLike, max_retries: int = 5, retry_delay: float = 2.0
+) -> bool:
     path = Path(dir_path)
     if not path.exists():
         return True
@@ -50,18 +47,18 @@ def get_file_hash(file_path: PathLike) -> str:
 def clean_text(text: str) -> str:
     if not text:
         return ""
-    text = re.sub(r'\s+', ' ', text).strip()
-    text = re.sub(r'[\x00-\x1F\x7F]', '', text)
-    text = re.sub(r'(?<=\d)。(?=\d)', '.', text)
-    text = re.sub(r'(?<!\d)。(?!\d)', '.', text)
-    text = text.replace('，', ',').replace('；', ';')
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"[\x00-\x1F\x7F]", "", text)
+    text = re.sub(r"(?<=\d)。(?=\d)", ".", text)
+    text = re.sub(r"(?<!\d)。(?!\d)", ".", text)
+    text = text.replace("，", ",").replace("；", ";")
     return text
 
 
 def split_text_by_sentence(text: str, max_len: int = 200, min_len: int = 20) -> List[str]:
     if not text:
         return []
-    sentence_seps = r'(?<!\d)([。！？；.!?;])(?![0-9.])'
+    sentence_seps = r"(?<!\d)([。！？；.!?;])(?![0-9.])"
     parts = [p.strip() for p in re.split(sentence_seps, text) if p.strip()]
 
     sentences: List[str] = []
@@ -92,7 +89,7 @@ def load_json_file(file_path: PathLike, default: Any = None) -> Any:
     if not path.exists():
         return default if default is not None else {}
     try:
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return default if default is not None else {}
@@ -102,7 +99,7 @@ def save_json_file(data: Any, file_path: PathLike) -> bool:
     path = Path(file_path)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         return True
     except Exception:
@@ -110,22 +107,27 @@ def save_json_file(data: Any, file_path: PathLike) -> bool:
 
 
 def calculate_risk_level(score: float) -> str:
-    if score < 30: return "低风险"
-    if score < 60: return "中风险"
-    if score < 90: return "高风险"
+    if score < 30:
+        return "低风险"
+    if score < 60:
+        return "中风险"
+    if score < 90:
+        return "高风险"
     return "极高风险"
 
 
-def setup_logger(name: str, log_file: Optional[str] = None, level: int = logging.INFO) -> logging.Logger:
+def setup_logger(
+    name: str, log_file: Optional[str] = None, level: int = logging.INFO
+) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(level)
     if not logger.handlers:
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
         if log_file:
-            file_handler = logging.FileHandler(log_file, encoding='utf-8')
+            file_handler = logging.FileHandler(log_file, encoding="utf-8")
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
     return logger

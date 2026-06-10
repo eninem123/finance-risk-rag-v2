@@ -11,9 +11,8 @@ src_path = str(Path(__file__).parent / "src")
 if src_path not in sys.path:
     sys.path.append(src_path)
 
-from finance_risk_rag.config import get_config  # noqa: E402
-from finance_risk_rag.extract_text import DocumentProcessor  # noqa: E402
 from finance_risk_rag.extract_entities import EntityExtractionPipeline  # noqa: E402
+from finance_risk_rag.extract_text import DocumentProcessor  # noqa: E402
 from finance_risk_rag.rag_core import RAGEngine  # noqa: E402
 
 
@@ -34,6 +33,7 @@ def cmd_extract(args):
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     import json
+
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(result.to_dict(), f, ensure_ascii=False, indent=2)
 
@@ -63,12 +63,16 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="子命令")
 
     # process 子命令
-    parser_process = subparsers.add_parser("process", help="运行 OCR 和文档分类")
+    subparsers.add_parser("process", help="运行 OCR 和文档分类")
 
     # extract 子命令
     parser_extract = subparsers.add_parser("extract", help="提取风险实体")
-    parser_extract.add_argument("--input", default="docs/all_extracted.txt", help="输入文本文件路径")
-    parser_extract.add_argument("--output", default="docs/entities_extracted.json", help="输出 JSON 文件路径")
+    parser_extract.add_argument(
+        "--input", default="docs/all_extracted.txt", help="输入文本文件路径"
+    )
+    parser_extract.add_argument(
+        "--output", default="docs/entities_extracted.json", help="输出 JSON 文件路径"
+    )
 
     # query 子命令
     parser_query = subparsers.add_parser("query", help="执行 RAG 查询")

@@ -3,8 +3,9 @@ Finance-Risk-RAG 文档处理器单元测试
 """
 
 from unittest.mock import MagicMock, patch
-from finance_risk_rag.extract_text import DocumentProcessor
+
 from finance_risk_rag.config import Config
+from finance_risk_rag.extract_text import DocumentProcessor
 
 
 def test_document_processor_initialization():
@@ -13,7 +14,7 @@ def test_document_processor_initialization():
     assert processor.config == config
 
 
-@patch('finance_risk_rag.extract_text.OpenAI')
+@patch("finance_risk_rag.extract_text.OpenAI")
 def test_classify_with_ai(mock_openai):
     # 配置 mock
     mock_client = MagicMock()
