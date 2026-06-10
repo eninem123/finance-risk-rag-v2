@@ -79,7 +79,10 @@ class DocumentProcessor:
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
             )
-            content = response.choices[0].message.content.strip()
+            raw_content = response.choices[0].message.content
+            if raw_content is None:
+                return {"type": "未知", "confidence": 0.0, "reason": "API 返回空内容"}
+            content = raw_content.strip()
             start = content.find("{")
             end = content.rfind("}") + 1
             return json.loads(content[start:end])
@@ -98,7 +101,7 @@ class DocumentProcessor:
         with pdfplumber.open(pdf_path) as pdf:
             for i, page in enumerate(pdf.pages):
                 page_text = page.extract_text()
-                if page_text and len(page_text.strip()) > 50:
+                if page_text is not None and len(page_text.strip()) > 50:
                     text += f"\n--- Page {i+1} (Text) ---\n{page_text}"
                 else:
                     img = page.to_image(resolution=self.config.ocr_dpi).original

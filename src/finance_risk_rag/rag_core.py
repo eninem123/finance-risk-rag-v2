@@ -3,11 +3,14 @@ Finance-Risk-RAG RAG核心引擎
 """
 
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import chromadb
+from chromadb.api.models.Collection import Collection
+from chromadb.api.types import EmbeddingFunction
 from chromadb.utils import embedding_functions as ef
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 from finance_risk_rag.config import get_config
 from finance_risk_rag.exceptions import LLMError
@@ -33,7 +36,7 @@ class LLMClientWrapper:
     def ask(self, query: str, context: str) -> str:
         if not self._client:
             raise LLMError("LLM客户端未初始化")
-        messages = [
+        messages: List[ChatCompletionMessageParam] = [
             {"role": "system", "content": "你是一名金融风险分析顾问。"},
             {"role": "user", "content": f"参考上下文回答问题：\n\n{context}\n\n问题：{query}"},
         ]
@@ -41,17 +44,22 @@ class LLMClientWrapper:
             response = self._client.chat.completions.create(
                 model=self._model_name, messages=messages, temperature=0.0
             )
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            if content is None:
+                return ""
+            return content
         except Exception as e:
             raise LLMError(f"LLM调用失败: {e}")
 
 
 class RAGDatabase:
-    def __init__(self, db_path: Path, embedding_fn: Optional[Callable] = None) -> None:
+    def __init__(self, db_path: Path, embedding_fn: Optional[EmbeddingFunction] = None) -> None:
         self._db_path = db_path
-        self._embedding_fn = embedding_fn or ef.ONNXMiniLM_L6_V2()
+        # Use cast to Any to avoid mypy attribute issues across different versions of chromadb
+        default_ef = cast(Any, ef).ONNXMiniLM_L6_V2()
+        self._embedding_fn = embedding_fn or default_ef
         self._client = chromadb.PersistentClient(path=str(db_path))
-        self._collection = self._client.get_or_create_collection(
+        self._collection: Collection = self._client.get_or_create_collection(
             name="finance_docs", embedding_function=self._embedding_fn
         )
 
@@ -59,16 +67,18 @@ class RAGDatabase:
         if not chunks:
             return 0
         documents = [c.content for c in chunks]
-        metadatas = [{"source": c.source, "index": c.chunk_index} for c in chunks]
+        metadatas = cast(Any, [{"source": c.source, "index": c.chunk_index} for c in chunks])
         ids = [f"{c.source}_{c.chunk_index}" for c in chunks]
         self._collection.add(documents=documents, metadatas=metadatas, ids=ids)
         return len(chunks)
 
     def query(self, query_text: str, top_k: int = 4) -> List[Dict[str, Any]]:
         results = self._collection.query(query_texts=[query_text], n_results=top_k)
-        docs = results.get("documents", [[]])[0]
-        metas = results.get("metadatas", [[]])[0]
-        return [{"content": d, "metadata": m} for d, m in zip(docs, metas)]
+        docs = results.get("documents")
+        metas = results.get("metadatas")
+        if docs is None or metas is None:
+            return []
+        return [{"content": d, "metadata": m} for d, m in zip(docs[0], metas[0])]
 
 
 class RAGEngine:

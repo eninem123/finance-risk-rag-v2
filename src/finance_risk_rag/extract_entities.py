@@ -59,8 +59,8 @@ class RuleBasedExtractor:
 
 class BERTExtractor:
     def __init__(self, model_path: Optional[Path] = None) -> None:
-        self._model = None
-        self._tokenizer = None
+        self._model: Any = None
+        self._tokenizer: Any = None
         if model_path:
             self.load_model(model_path)
 
