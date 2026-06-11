@@ -19,14 +19,13 @@ logger = logging.getLogger(__name__)
 class RuleBasedExtractor:
     """基于规则的实体提取器"""
 
-    def __init__(self, rules_path: Optional[Path] = None):
+    def __init__(self, config=None, rules_path: Optional[Path] = None):
+        self.config = config or get_config()
         self.rules = {}
         if rules_path:
             self.load_rules(rules_path)
-        else:
-            config = get_config()
-            if config.risk_entities_path.exists():
-                self.load_rules(config.risk_entities_path)
+        elif self.config.risk_entities_path.exists():
+            self.load_rules(self.config.risk_entities_path)
 
     def load_rules(self, rules_path: Path):
         try:
@@ -138,10 +137,10 @@ class BERTExtractor:
 class EntityExtractionPipeline:
     """实体提取管道"""
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, rule_extractor=None, bert_extractor=None):
         self.config = config or get_config()
-        self.rule_extractor = RuleBasedExtractor()
-        self.bert_extractor = BERTExtractor(self.config.bert_local_path)
+        self.rule_extractor = rule_extractor or RuleBasedExtractor(config=self.config)
+        self.bert_extractor = bert_extractor or BERTExtractor(self.config.bert_local_path)
 
     def process(self, text_or_path: Union[str, Path]) -> ExtractionResult:
         if isinstance(text_or_path, Path):
@@ -154,19 +153,41 @@ class EntityExtractionPipeline:
         rule_entities = self.rule_extractor.extract(text)
         bert_entities = self.bert_extractor.extract(text)
 
-        # Simple merging logic
-        final_entities = rule_entities + bert_entities
-        # Deduplicate
-        unique_entities = {}
-        for e in final_entities:
-            key = e.key
-            if key not in unique_entities or e.risk_score > unique_entities[key].risk_score:
-                unique_entities[key] = e
+        # Advanced merging logic: Score-based arbitration and overlap resolution
+        entities_list = self._merge_and_arbitrate(rule_entities, bert_entities)
 
-        entities_list = list(unique_entities.values())
         total_risk = sum(e.risk_score for e in entities_list)
         risk_level = calculate_risk_level(total_risk)
 
         return ExtractionResult(
             entities=entities_list, total_risk_score=total_risk, risk_level=risk_level
         )
+
+    def _merge_and_arbitrate(self, rule_entities: List[Entity], bert_entities: List[Entity]) -> List[Entity]:
+        """
+        合并规则引擎和 BERT 的结果，处理重叠。
+        优先考虑高分和高置信度的实体。
+        """
+        all_entities = rule_entities + bert_entities
+        if not all_entities:
+            return []
+
+        # 按得分和置信度排序
+        all_entities.sort(key=lambda x: (x.risk_score, x.confidence), reverse=True)
+
+        final_entities: List[Entity] = []
+
+        for current in all_entities:
+            is_redundant = False
+            for existing in final_entities:
+                # 简单的重叠检测：如果文本完全包含或被包含，且类型相似
+                if (current.text in existing.text or existing.text in current.text) and (
+                    current.type == existing.type or current.risk_score == existing.risk_score
+                ):
+                    is_redundant = True
+                    break
+
+            if not is_redundant:
+                final_entities.append(current)
+
+        return final_entities
