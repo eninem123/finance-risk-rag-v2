@@ -22,9 +22,13 @@ logger = logging.getLogger(__name__)
 class RAGEngine:
     """RAG 引擎主类"""
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, llm_client=None):
         self.config = config or get_config()
-        self.llm_client = LLMClientWrapper()
+        self.llm_client = llm_client or LLMClientWrapper(
+            api_key=self.config.llm_api_key,
+            base_url=self.config.llm_base_url,
+            model_name=self.config.llm_model_name,
+        )
         self._db_path = self.config.chroma_db_dir
         ensure_dirs(self._db_path)
 
@@ -41,9 +45,31 @@ class RAGEngine:
         except Exception as e:
             raise DatabaseError(f"Failed to initialize ChromaDB: {e}")
 
-    def add_documents(self, txt_files: List[Path]):
+    def add_documents(self, txt_files: List[Path], force: bool = False):
+        """
+        向向量数据库添加文档，支持增量更新。
+        """
         for txt_file in txt_files:
             try:
+                from .utils import get_file_hash
+
+                current_hash = get_file_hash(txt_file)
+
+                # 检查是否已索引且未改变
+                if not force:
+                    existing = self._collection.get(
+                        where={"source": txt_file.name}, include=["metadatas"]
+                    )
+                    if existing and existing["metadatas"]:
+                        # 检查第一个 chunk 的 hash 是否一致
+                        if existing["metadatas"][0].get("hash") == current_hash:
+                            logger.info(f"Skipping indexing for {txt_file.name} (unchanged)")
+                            continue
+                        else:
+                            # 如果已改变，先删除旧的索引
+                            logger.info(f"Updating index for {txt_file.name} (content changed)")
+                            self._collection.delete(where={"source": txt_file.name})
+
                 content = txt_file.read_text(encoding="utf-8")
                 cleaned = clean_text(content)
                 sentences = split_text_by_sentence(cleaned, max_len=self.config.chunk_size)
@@ -54,12 +80,14 @@ class RAGEngine:
 
                 for i, sent in enumerate(sentences):
                     documents.append(sent)
-                    metadatas.append({"source": txt_file.name, "chunk_index": i})
+                    metadatas.append(
+                        {"source": txt_file.name, "chunk_index": i, "hash": current_hash}
+                    )
                     ids.append(f"{txt_file.name}_{i}")
 
                 if documents:
                     self._collection.add(documents=documents, metadatas=metadatas, ids=ids)
-                    logger.info(f"Added {len(documents)} chunks from {txt_file.name}")
+                    logger.info(f"Indexed {len(documents)} chunks from {txt_file.name}")
             except Exception as e:
                 logger.error(f"Failed to index {txt_file}: {e}")
 

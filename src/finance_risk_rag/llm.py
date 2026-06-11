@@ -4,6 +4,7 @@ Finance-Risk-RAG LLM 客户端模块
 """
 
 import logging
+import time
 from typing import Dict, List, Optional
 
 from .config import get_config
@@ -46,20 +47,41 @@ class LLMClientWrapper:
         return self._client is not None
 
     def chat(
-        self, messages: List[Dict[str, str]], temperature: float = 0.0, max_tokens: int = 1000
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        max_retries: int = 3,
+        initial_backoff: float = 1.0,
     ) -> str:
+        """
+        发送聊天请求，带有指数退避重试机制。
+        """
         if not self.is_available:
             raise LLMError("LLM client not initialized.")
-        try:
-            response = self._client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            raise LLMError(f"LLM call failed: {e}")
+
+        retries = 0
+        while retries <= max_retries:
+            try:
+                response = self._client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                retries += 1
+                if retries > max_retries:
+                    logger.error(f"LLM call failed after {max_retries} retries: {e}")
+                    raise LLMError(f"LLM call failed after {max_retries} retries: {e}")
+
+                wait_time = initial_backoff * (2 ** (retries - 1))
+                logger.warning(f"LLM call failed: {e}. Retrying in {wait_time:.2f}s... ({retries}/{max_retries})")
+                time.sleep(wait_time)
+
+        # Should not reach here
+        raise LLMError("Unexpected exit from retry loop.")
 
     def ask(self, query: str, context: str) -> str:
         messages = [

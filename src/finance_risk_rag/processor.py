@@ -4,8 +4,9 @@ Finance-Risk-RAG 文档处理模块
 """
 
 import logging
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import pdfplumber
 import pytesseract
@@ -23,9 +24,13 @@ logger = logging.getLogger(__name__)
 class DocumentProcessor:
     """处理 PDF 文档并提取文本"""
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, llm_client=None):
         self.config = config or get_config()
-        self.llm_client = LLMClientWrapper()
+        self.llm_client = llm_client or LLMClientWrapper(
+            api_key=self.config.llm_api_key,
+            base_url=self.config.llm_base_url,
+            model_name=self.config.llm_model_name,
+        )
         if self.config.tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = self.config.tesseract_cmd
 
@@ -100,47 +105,83 @@ class DocumentProcessor:
             logger.error(f"Error processing {pdf_path}: {e}")
             raise OCRError(f"PDF extraction failed for {pdf_path}: {e}")
 
-    def process_directory(self, docs_dir: Optional[Path] = None):
+    def _process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
+        """处理单个 PDF 的内部方法，用于并行化"""
+        file_hash = get_file_hash(pdf_path)
+        log = load_json_file(self.config.processing_log_path)
+        cached = log.get(pdf_path.name, {})
+        txt_path = pdf_path.with_suffix(".txt")
+
+        if (
+            cached.get("hash") == file_hash
+            and cached.get("ocr_version") == self.config.ocr_version
+            and txt_path.exists()
+        ):
+            logger.info(f"Skipping {pdf_path.name} (cached)")
+            text = txt_path.read_text(encoding="utf-8")
+            classification_dict = cached.get("classification", {"type": "未知", "confidence": 0.0})
+            ocr_count = cached.get("ocr_pages", 0)
+        else:
+            logger.info(f"Processing {pdf_path.name}")
+            text, ocr_count = self.extract_text_from_pdf(pdf_path)
+            txt_path.write_text(text, encoding="utf-8")
+            classification = self.classify_document(text)
+            classification_dict = classification.to_dict()
+
+        return {
+            "name": pdf_path.name,
+            "text": text,
+            "classification": classification_dict,
+            "hash": file_hash,
+            "ocr_pages": ocr_count,
+            "ocr_version": self.config.ocr_version,
+        }
+
+    def process_directory(self, docs_dir: Optional[Path] = None, max_workers: int = 4):
         docs_dir = docs_dir or self.config.docs_dir
         pdf_files = list(docs_dir.glob("*.pdf"))
         log = load_json_file(self.config.processing_log_path)
 
         all_text = ""
         classifications = {}
+        results = []
 
-        for pdf_path in pdf_files:
-            file_hash = get_file_hash(pdf_path)
-            cached = log.get(pdf_path.name, {})
-            txt_path = pdf_path.with_suffix(".txt")
+        if not pdf_files:
+            logger.info("No PDF files found to process.")
+            return
 
-            if (
-                cached.get("hash") == file_hash
-                and cached.get("ocr_version") == self.config.ocr_version
-                and txt_path.exists()
-            ):
-                logger.info(f"Skipping {pdf_path.name} (cached)")
-                text = txt_path.read_text(encoding="utf-8")
-                classification_data = cached.get("classification", {"type": "未知"})
-                classification = ClassificationResult(
-                    type=classification_data.get("type", "未知"),
-                    confidence=classification_data.get("confidence", 0.0),
-                    reason=classification_data.get("reason", ""),
-                )
-            else:
-                logger.info(f"Processing {pdf_path.name}")
-                text, ocr_count = self.extract_text_from_pdf(pdf_path)
-                txt_path.write_text(text, encoding="utf-8")
-                classification = self.classify_document(text)
+        # 并行处理文件
+        if max_workers <= 1:
+            for pdf in pdf_files:
+                try:
+                    results.append(self._process_single_pdf(pdf))
+                except Exception as e:
+                    logger.error(f"Failed to process {pdf.name}: {e}")
+        else:
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                future_to_pdf = {executor.submit(self._process_single_pdf, pdf): pdf for pdf in pdf_files}
+                for future in as_completed(future_to_pdf):
+                    try:
+                        res = future.result()
+                        results.append(res)
+                    except Exception as e:
+                        pdf = future_to_pdf[future]
+                        logger.error(f"Failed to process {pdf.name}: {e}")
 
-                log[pdf_path.name] = {
-                    "hash": file_hash,
-                    "ocr_version": self.config.ocr_version,
-                    "classification": classification.to_dict(),
-                    "ocr_pages": ocr_count,
-                }
+        # 聚合结果并更新日志 (保持某种程度的顺序以便合并)
+        # Sort by name to keep all_extracted.txt consistent
+        results.sort(key=lambda x: x["name"])
 
-            all_text += text + "\n\n" + "=" * 60 + "\n\n"
-            classifications[pdf_path.name] = classification.to_dict()
+        for res in results:
+            name = res["name"]
+            all_text += res["text"] + "\n\n" + "=" * 60 + "\n\n"
+            classifications[name] = res["classification"]
+            log[name] = {
+                "hash": res["hash"],
+                "ocr_version": res["ocr_version"],
+                "classification": res["classification"],
+                "ocr_pages": res["ocr_pages"],
+            }
 
         (docs_dir / "all_extracted.txt").write_text(all_text, encoding="utf-8")
         save_json_file(classifications, docs_dir / "classification.json")

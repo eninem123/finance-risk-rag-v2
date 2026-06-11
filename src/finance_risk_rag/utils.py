@@ -30,49 +30,82 @@ def get_file_hash(file_path: PathLike) -> str:
 
 
 def clean_text(text: str) -> str:
+    """
+    针对财务文本优化的清洗函数。
+    处理特殊的 Unicode 字符、多余空白、并标准化标点符号。
+    """
     if not text:
         return ""
-    text = re.sub(r"\s+", " ", text).strip()
-    text = re.sub(r"[\x00-\x1F\x7F]", "", text)
+
+    # 替换常见的乱码或特殊空白
+    text = text.replace("\xa0", " ").replace("\u3000", " ")
+
+    # 规范化标点
+    text = text.replace("，", ",").replace("；", ";").replace("：", ":")
+    text = text.replace("（", "(").replace("）", ")").replace("【", "[").replace("】", "]")
+
+    # 处理数字中的中文句号（常见于 OCR 错误）
     text = re.sub(r"(?<=\d)。(?=\d)", ".", text)
-    text = re.sub(r"(?<!\d)。(?!\d)", ".", text)
-    text = text.replace("，", ",").replace("；", ";")
+
+    # 压缩空白
+    text = re.sub(r"\s+", " ", text).strip()
+
+    # 过滤掉不可见字符
+    text = "".join(ch for ch in text if ch.isprintable())
+
     return text
 
 
-def split_text_by_sentence(text: str, max_len: int = 200) -> List[str]:
+def split_text_by_sentence(text: str, max_len: int = 400, min_len: int = 50) -> List[str]:
+    """
+    将文本拆分为语义完整的块，针对财务报告进行了优化。
+    """
     if not text:
         return []
-    sentence_seps = r"(?<!\d)([。！？；.!?;])(?![0-9.])"
 
-    # Use capturing group to keep separators
-    parts = [p.strip() for p in re.split(sentence_seps, text) if p.strip()]
+    # 改进的句子分隔符，更好地处理中英文混排
+    sentence_seps = r"([。！？；.!?;])(?![0-9])"
 
-    sentences: List[str] = []
-    i = 0
-    while i < len(parts):
-        content = parts[i]
-        # Check if next part is a separator
-        if i + 1 < len(parts) and re.match(sentence_seps, parts[i + 1]):
-            sentences.append(f"{content}{parts[i+1]}")
-            i += 2
-        else:
-            sentences.append(content)
-            i += 1
+    # 使用捕获分组保留分隔符
+    raw_parts = re.split(sentence_seps, text)
 
-    # Simple merge logic
-    merged: List[str] = []
-    current = ""
+    # 重组句子
+    sentences = []
+    for i in range(0, len(raw_parts) - 1, 2):
+        sentences.append(raw_parts[i] + raw_parts[i + 1])
+    if len(raw_parts) % 2 == 1 and raw_parts[-1]:
+        sentences.append(raw_parts[-1])
+
+    # 智能合并，确保分块不会太碎且不超过 max_len
+    chunks: List[str] = []
+    current_chunk = ""
+
     for sent in sentences:
-        if len(current) + len(sent) <= max_len:
-            current += sent
+        sent = sent.strip()
+        if not sent:
+            continue
+
+        if len(current_chunk) + len(sent) <= max_len:
+            current_chunk += (" " if current_chunk else "") + sent
         else:
-            if current:
-                merged.append(current)
-            current = sent
-    if current:
-        merged.append(current)
-    return merged
+            if current_chunk:
+                chunks.append(current_chunk)
+            # 如果单句就超过 max_len，强制截断（虽然罕见）
+            if len(sent) > max_len:
+                for i in range(0, len(sent), max_len):
+                    chunks.append(sent[i : i + max_len])
+                current_chunk = ""
+            else:
+                current_chunk = sent
+
+    if current_chunk:
+        # 如果最后一个块太短，尝试合并到上一个块（如果可能）
+        if chunks and len(current_chunk) < min_len and len(chunks[-1]) + len(current_chunk) <= max_len:
+            chunks[-1] += " " + current_chunk
+        else:
+            chunks.append(current_chunk)
+
+    return chunks
 
 
 def load_json_file(file_path: PathLike, default: Any = None) -> Any:

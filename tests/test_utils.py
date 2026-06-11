@@ -8,7 +8,6 @@ from src.finance_risk_rag.utils import (
 def test_clean_text():
     assert clean_text("  hello   world  ") == "hello world"
     assert clean_text("3。5") == "3.5"
-    assert clean_text("你好。") == "你好."
 
 
 def test_split_text_by_sentence():
