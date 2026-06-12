@@ -91,17 +91,33 @@ class RAGEngine:
             except Exception as e:
                 logger.error(f"Failed to index {txt_file}: {e}")
 
-    def query(self, question: str, top_k: int = 4) -> QueryResult:
+    def query(self, question: str, top_k: int = 10, confidence_threshold: float = 0.5) -> QueryResult:
         try:
             results = self._collection.query(query_texts=[question], n_results=top_k)
 
-            docs = results.get("documents", [[]])[0]
-            metas = results.get("metadatas", [[]])[0]
+            all_docs = results.get("documents", [[]])[0]
+            all_metas = results.get("metadatas", [[]])[0]
+            all_distances = results.get("distances", [[]])[0]
 
-            context = "\n\n".join(docs)
+            # 简单的置信度过滤 (距离越小，置信度越高)
+            filtered_docs = []
+            filtered_metas = []
+            for doc, meta, dist in zip(all_docs, all_metas, all_distances):
+                # ChromaDB 默认使用 L2 距离，这里做一个简单的归一化模拟
+                confidence = 1.0 / (1.0 + dist)
+                if confidence >= confidence_threshold:
+                    filtered_docs.append(doc)
+                    filtered_metas.append(meta)
+
+            if not filtered_docs:
+                # 如果过滤后为空，回退到取前 2 个，或者提示无相关信息
+                filtered_docs = all_docs[:2]
+                filtered_metas = all_metas[:2]
+
+            context = "\n\n".join(filtered_docs)
             answer = self.llm_client.ask(question, context)
 
-            return QueryResult(answer=answer, sources=metas, confidence=1.0)
+            return QueryResult(answer=answer, sources=filtered_metas, confidence=1.0)
         except Exception as e:
             raise RAGError(f"Query failed: {e}")
 

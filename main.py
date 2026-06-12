@@ -10,6 +10,7 @@ from src.finance_risk_rag.config import get_config
 from src.finance_risk_rag.engine import RAGEngine
 from src.finance_risk_rag.extractor import EntityExtractionPipeline
 from src.finance_risk_rag.processor import DocumentProcessor
+from src.finance_risk_rag.service import RiskAnalysisService
 from src.finance_risk_rag.utils import setup_logger
 
 
@@ -34,6 +35,11 @@ def main():
     query_parser = subparsers.add_parser("query", help="执行 RAG 问答")
     query_parser.add_argument("question", type=str, help="用户问题")
     query_parser.add_argument("--build", action="store_true", help="先构建索引")
+
+    # Report 子命令
+    report_parser = subparsers.add_parser("report", help="生成全面风险报告")
+    report_parser.add_argument("--dir", type=str, help="文档目录")
+    report_parser.add_argument("--md", type=str, default="risk_report.md", help="输出 Markdown 文件名")
 
     args = parser.parse_args()
     config = get_config()
@@ -63,6 +69,16 @@ def main():
         result = engine.query(args.question)
         print(f"\n回答: {result.answer}")
         print(f"\n来源: {result.sources}")
+
+    elif args.command == "report":
+        service = RiskAnalysisService(config)
+        docs_dir = Path(args.dir) if args.dir else config.docs_dir
+        print(f"正在分析目录 {docs_dir} 并生成报告...")
+        report_data = service.analyze_directory(docs_dir)
+
+        md_path = docs_dir / args.md
+        service.generate_markdown_report(report_data, md_path)
+        print(f"报告生成完成！\nJSON 报告: {docs_dir / 'risk_report.json'}\nMarkdown 报告: {md_path}")
 
     else:
         parser.print_help()
