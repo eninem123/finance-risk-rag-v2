@@ -20,9 +20,7 @@ class Config:
     # ==================== 路径配置 ====================
 
     # 项目根目录
-    base_dir: Path = field(
-        default_factory=lambda: Path(__file__).parent.parent.parent.resolve()
-    )
+    base_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
 
     # BERT本地模型路径
     bert_local_path: Optional[Path] = None

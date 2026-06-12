@@ -47,9 +47,7 @@ class DocumentProcessor:
 
     def classify_document(self, text_sample: str) -> ClassificationResult:
         if not self.llm_client.is_available:
-            return ClassificationResult(
-                type="未知", confidence=0.0, reason="LLM unavailable"
-            )
+            return ClassificationResult(type="未知", confidence=0.0, reason="LLM unavailable")
 
         prompt = f"""
 请判断以下财务文档属于哪一类？输出 JSON 格式。
@@ -72,9 +70,7 @@ class DocumentProcessor:
         try:
             import json
 
-            response = self.llm_client.chat(
-                [{"role": "user", "content": prompt}], temperature=0.2
-            )
+            response = self.llm_client.chat([{"role": "user", "content": prompt}], temperature=0.2)
             start = response.find("{")
             end = response.rfind("}") + 1
             data = json.loads(response[start:end])
@@ -125,9 +121,7 @@ class DocumentProcessor:
         ):
             logger.info(f"Skipping {pdf_path.name} (cached)")
             text = txt_path.read_text(encoding="utf-8")
-            classification_dict = cached.get(
-                "classification", {"type": "未知", "confidence": 0.0}
-            )
+            classification_dict = cached.get("classification", {"type": "未知", "confidence": 0.0})
             ocr_count = cached.get("ocr_pages", 0)
         else:
             logger.info(f"Processing {pdf_path.name}")
@@ -168,8 +162,7 @@ class DocumentProcessor:
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
                 future_to_pdf = {
-                    executor.submit(self._process_single_pdf, pdf): pdf
-                    for pdf in pdf_files
+                    executor.submit(self._process_single_pdf, pdf): pdf for pdf in pdf_files
                 }
                 for future in as_completed(future_to_pdf):
                     try:

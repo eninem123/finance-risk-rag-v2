@@ -15,9 +15,7 @@ from src.finance_risk_rag.utils import setup_logger
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Finance-Risk-RAG: 银行级财务文本风控 AI 系统"
-    )
+    parser = argparse.ArgumentParser(description="Finance-Risk-RAG: 银行级财务文本风控 AI 系统")
     subparsers = parser.add_subparsers(dest="command", help="子命令")
 
     # Process 子命令
@@ -65,9 +63,7 @@ def main():
         from src.finance_risk_rag.utils import save_json_file
 
         save_json_file(result.to_dict(), Path(args.output))
-        print(
-            f"实体提取完成。风险等级: {result.risk_level}, 总分: {result.total_risk_score}"
-        )
+        print(f"实体提取完成。风险等级: {result.risk_level}, 总分: {result.total_risk_score}")
 
     elif args.command == "query":
         engine = RAGEngine(config)

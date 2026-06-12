@@ -42,9 +42,7 @@ def clean_text(text: str) -> str:
 
     # 规范化标点
     text = text.replace("，", ",").replace("；", ";").replace("：", ":")
-    text = (
-        text.replace("（", "(").replace("）", ")").replace("【", "[").replace("】", "]")
-    )
+    text = text.replace("（", "(").replace("）", ")").replace("【", "[").replace("】", "]")
 
     # 处理数字中的中文句号（常见于 OCR 错误）
     text = re.sub(r"(?<=\d)。(?=\d)", ".", text)
@@ -58,9 +56,7 @@ def clean_text(text: str) -> str:
     return text
 
 
-def split_text_by_sentence(
-    text: str, max_len: int = 400, min_len: int = 50
-) -> List[str]:
+def split_text_by_sentence(text: str, max_len: int = 400, min_len: int = 50) -> List[str]:
     """
     将文本拆分为语义完整的块，针对财务报告进行了优化。
     """
@@ -140,9 +136,7 @@ def setup_logger(
     logger = logging.getLogger(name)
     logger.setLevel(level)
     if not logger.handlers:
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)

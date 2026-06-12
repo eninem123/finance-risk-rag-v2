@@ -21,18 +21,14 @@ class ScoringStrategy(ABC):
     """风险评分策略接口"""
 
     @abstractmethod
-    def calculate_score(
-        self, entity_type: str, base_score: int, confidence: float
-    ) -> int:
+    def calculate_score(self, entity_type: str, base_score: int, confidence: float) -> int:
         pass
 
 
 class DefaultScoringStrategy(ScoringStrategy):
     """默认评分策略"""
 
-    def calculate_score(
-        self, entity_type: str, base_score: int, confidence: float
-    ) -> int:
+    def calculate_score(self, entity_type: str, base_score: int, confidence: float) -> int:
         # 简单加权
         return int(base_score * confidence)
 
@@ -109,13 +105,10 @@ class BERTExtractor:
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import (AutoModelForTokenClassification,
-                                      AutoTokenizer, pipeline)
+            from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
-            self.model = AutoModelForTokenClassification.from_pretrained(
-                str(model_path)
-            )
+            self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
             self.device = 0 if torch.cuda.is_available() else -1
             self.nlp = pipeline(
                 "ner",
@@ -149,9 +142,7 @@ class BERTExtractor:
                         confidence=float(res["score"]),
                         start_char=res["start"],
                         end_char=res["end"],
-                        context=text[
-                            max(0, res["start"] - 40) : min(len(text), res["end"] + 40)
-                        ],
+                        context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
                         source="bert",
                     )
                 )
@@ -173,9 +164,7 @@ class EntityExtractionPipeline:
     ):
         self.config = config or get_config()
         self.rule_extractor = rule_extractor or RuleBasedExtractor(config=self.config)
-        self.bert_extractor = bert_extractor or BERTExtractor(
-            self.config.bert_local_path
-        )
+        self.bert_extractor = bert_extractor or BERTExtractor(self.config.bert_local_path)
         self.scoring_strategy = scoring_strategy or DefaultScoringStrategy()
 
     def process(self, text_or_path: Union[str, Path]) -> ExtractionResult:
@@ -235,11 +224,8 @@ class EntityExtractionPipeline:
                         break
                 else:
                     # 回退到简单的字符串包含检测
-                    if (
-                        current.text in existing.text or existing.text in current.text
-                    ) and (
-                        current.type == existing.type
-                        or current.risk_score == existing.risk_score
+                    if (current.text in existing.text or existing.text in current.text) and (
+                        current.type == existing.type or current.risk_score == existing.risk_score
                     ):
                         is_redundant = True
                         break

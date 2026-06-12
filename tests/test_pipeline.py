@@ -35,9 +35,7 @@ def test_full_pipeline_integration(tmp_path):
     # Mock LLM and OCR
     mock_llm = MagicMock()
     mock_llm.is_available = True
-    mock_llm.chat.return_value = (
-        '{"type": "财报", "confidence": 0.95, "reason": "test"}'
-    )
+    mock_llm.chat.return_value = '{"type": "财报", "confidence": 0.95, "reason": "test"}'
     mock_llm.ask.return_value = "The market risk is moderate."
 
     with patch("pdfplumber.open"), patch(
