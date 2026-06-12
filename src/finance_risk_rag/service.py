@@ -7,13 +7,13 @@ Finance-Risk-RAG 风险分析服务层
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from .config import get_config
 from .engine import RAGEngine
 from .extractor import EntityExtractionPipeline
 from .processor import DocumentProcessor
-from .utils import load_json_file, save_json_file
+from .utils import save_json_file
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class RiskAnalysisService:
         report_data = {
             "directory": str(docs_dir),
             "summary": extraction_result.to_dict(),
-            "status": "completed"
+            "status": "completed",
         }
 
         report_path = docs_dir / "risk_report.json"
@@ -70,7 +70,7 @@ class RiskAnalysisService:
             "\n---",
             "\n## 🔍 识别到的风险实体",
             "| 类型 | 实体文本 | 风险分数 | 置信度 | 来源 |",
-            "| :--- | :--- | :--- | :--- | :--- |"
+            "| :--- | :--- | :--- | :--- | :--- |",
         ]
 
         for entity in summary.get("entities", []):

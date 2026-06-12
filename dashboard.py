@@ -1,7 +1,9 @@
-import streamlit as st
-import pandas as pd
-from pathlib import Path
 import json
+from pathlib import Path
+
+import pandas as pd
+import streamlit as st
+
 from src.finance_risk_rag.config import get_config
 from src.finance_risk_rag.service import RiskAnalysisService
 
@@ -37,10 +39,15 @@ if report_path.exists():
     st.subheader("🔍 风险实体列表")
     df = pd.DataFrame(summary["entities"])
     if not df.empty:
-        st.dataframe(df[["type", "text", "risk_score", "confidence", "source"]], use_container_width=True)
+        st.dataframe(
+            df[["type", "text", "risk_score", "confidence", "source"]],
+            use_container_width=True,
+        )
 
     st.subheader("💡 风险问答 (RAG)")
-    question = st.text_input("针对本项目提出你的疑问：", placeholder="例如：这笔贷款的主要风险点在哪里？")
+    question = st.text_input(
+        "针对本项目提出你的疑问：", placeholder="例如：这笔贷款的主要风险点在哪里？"
+    )
     if question:
         with st.spinner("思考中..."):
             res = service.engine.query(question)

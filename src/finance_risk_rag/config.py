@@ -20,7 +20,9 @@ class Config:
     # ==================== 路径配置 ====================
 
     # 项目根目录
-    base_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
+    base_dir: Path = field(
+        default_factory=lambda: Path(__file__).parent.parent.parent.resolve()
+    )
 
     # BERT本地模型路径
     bert_local_path: Optional[Path] = None
@@ -89,7 +91,13 @@ class Config:
 
     def _resolve_paths(self) -> None:
         # 将相对路径转换为绝对路径
-        for attr in ["chroma_db_dir", "cache_dir", "log_dir", "docs_dir", "knowledge_base_dir"]:
+        for attr in [
+            "chroma_db_dir",
+            "cache_dir",
+            "log_dir",
+            "docs_dir",
+            "knowledge_base_dir",
+        ]:
             path_val = getattr(self, attr)
             if not path_val.is_absolute():
                 setattr(self, attr, self.base_dir / path_val)
