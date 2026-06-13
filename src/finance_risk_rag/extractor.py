@@ -91,7 +91,11 @@ class BERTExtractor:
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
+            from transformers import (
+                AutoModelForTokenClassification,
+                AutoTokenizer,
+                pipeline,
+            )
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
