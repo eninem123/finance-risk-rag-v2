@@ -8,7 +8,7 @@ Finance-Risk-RAG 配置模块
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 
 @dataclass
@@ -64,6 +64,14 @@ class Config:
     risk_level_low: int = 30
     risk_level_medium: int = 60
     risk_level_high: int = 90
+
+    # BERT 实体类型分值映射
+    bert_risk_mapping: Dict[str, int] = field(default_factory=lambda: {
+        "RISK": 30,
+        "MONEY": 25,
+        "ORG": 15,
+        "PER": 5,
+    })
 
     # ==================== 处理配置 ====================
 

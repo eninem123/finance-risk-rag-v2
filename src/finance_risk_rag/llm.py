@@ -29,7 +29,7 @@ class LLMClientWrapper:
         self._client = None
 
         if not self.api_key:
-            logger.warning("LLM API key not found.")
+            logger.warning("LLM API key not found. LLM features will be disabled.")
             return
 
         self._initialize_client()
@@ -39,6 +39,9 @@ class LLMClientWrapper:
             from openai import OpenAI
 
             self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            logger.info(f"Initialized LLM client with model: {self.model_name}")
+        except ImportError:
+            logger.error("OpenAI package not installed. Run 'pip install openai'.")
         except Exception as e:
             raise LLMError(f"Failed to initialize OpenAI client: {e}")
 
@@ -50,7 +53,7 @@ class LLMClientWrapper:
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.0,
-        max_tokens: int = 1000,
+        max_tokens: int = 1500,
         max_retries: int = 3,
         initial_backoff: float = 1.0,
     ) -> str:
@@ -58,7 +61,7 @@ class LLMClientWrapper:
         发送聊天请求，带有指数退避重试机制。
         """
         if not self.is_available:
-            raise LLMError("LLM client not initialized.")
+            raise LLMError("LLM client not initialized or API key missing.")
 
         retries = 0
         while retries <= max_retries:
@@ -71,27 +74,36 @@ class LLMClientWrapper:
                 )
                 return response.choices[0].message.content
             except Exception as e:
+                error_msg = str(e)
+                # 检查是否为配额或频率限制错误
+                if "rate limit" in error_msg.lower() or "quota" in error_msg.lower():
+                    logger.warning(f"LLM Rate limit/Quota exceeded: {e}")
+
                 retries += 1
                 if retries > max_retries:
                     logger.error(f"LLM call failed after {max_retries} retries: {e}")
                     raise LLMError(f"LLM call failed after {max_retries} retries: {e}")
 
                 wait_time = initial_backoff * (2 ** (retries - 1))
-                logger.warning(f"LLM call failed: {e}. Retrying in {wait_time:.2f}s... ({retries}/{max_retries})")
+                logger.warning(f"LLM call attempt {retries} failed: {e}. Retrying in {wait_time:.2f}s...")
                 time.sleep(wait_time)
 
-        # Should not reach here
         raise LLMError("Unexpected exit from retry loop.")
 
     def ask(self, query: str, context: str) -> str:
+        """基于上下文回答问题，带有更完善的系统提示词"""
+        system_prompt = (
+            "你是一名资深的金融风险分析专家。请根据提供的上下文内容，严谨、专业地回答用户问题。"
+            "如果上下文中没有相关信息，请明确告知，不要编造。回答应包含关键风险点分析和结论建议。"
+        )
         messages = [
             {
                 "role": "system",
-                "content": "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。",
+                "content": system_prompt,
             },
             {
                 "role": "user",
-                "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}",
+                "content": f"【参考上下文】\n{context}\n\n【用户问题】\n{query}\n\n请开始分析：",
             },
         ]
         return self.chat(messages)
