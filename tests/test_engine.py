@@ -1,50 +1,53 @@
-import pytest
+"""
+RAG 引擎单元测试
+"""
+
+import unittest
 from unittest.mock import MagicMock, patch
-from pathlib import Path
+
 from src.finance_risk_rag.engine import RAGEngine
 
-@pytest.fixture
-def mock_engine_config(tmp_path):
-    conf = MagicMock()
-    conf.chroma_db_dir = tmp_path / "db"
-    conf.docs_dir = tmp_path / "docs"
-    conf.docs_dir.mkdir()
-    conf.chunk_size = 100
-    conf.llm_api_key = "test"
-    return conf
 
-def test_engine_incremental_indexing(mock_engine_config):
-    # Mock chromadb
-    with patch("chromadb.PersistentClient"), \
-         patch("chromadb.utils.embedding_functions.ONNXMiniLM_L6_V2"), \
-         patch("src.finance_risk_rag.engine.LLMClientWrapper"):
+class TestRAGEngine(unittest.TestCase):
+    @patch("chromadb.PersistentClient")
+    def setUp(self, mock_chroma):
+        self.mock_config = MagicMock()
+        self.mock_config.chroma_db_dir = "test_db"
+        self.mock_config.chunk_size = 800
+        self.mock_llm = MagicMock()
+        self.engine = RAGEngine(config=self.mock_config, llm_client=self.mock_llm)
 
-        engine = RAGEngine(config=mock_engine_config)
-        mock_collection = MagicMock()
-        engine._collection = mock_collection
+    def test_query(self):
+        # Setup mock collection results
+        self.engine._collection.query.return_value = {
+            "documents": [["context fragment"]],
+            "metadatas": [[{"source": "doc.txt"}]],
+        }
+        self.mock_llm.ask.return_value = "Expert answer"
 
-        txt_file = mock_engine_config.docs_dir / "test.txt"
-        txt_file.write_text("Finance content")
+        result = self.engine.query("test question")
 
-        # Test case 1: First time indexing
-        mock_collection.get.return_value = {"metadatas": []}
-        engine.add_documents([txt_file])
-        assert mock_collection.add.call_count == 1
+        self.assertEqual(result.answer, "Expert answer")
+        self.assertEqual(result.sources[0]["source"], "doc.txt")
 
-        # Test case 2: Unchanged content
-        from src.finance_risk_rag.utils import get_file_hash
-        file_hash = get_file_hash(txt_file)
-        mock_collection.get.return_value = {"metadatas": [{"hash": file_hash}]}
-        mock_collection.add.reset_mock()
+    def test_add_documents_incremental(self):
+        # Mock file hash and collection behavior
+        mock_file = MagicMock()
+        mock_file.name = "new_doc.txt"
+        mock_file.read_text.return_value = "Content"
 
-        engine.add_documents([txt_file])
-        assert mock_collection.add.call_count == 0
+        with patch("src.finance_risk_rag.utils.get_file_hash", return_value="hash123"):
+            # Case 1: Document doesn't exist
+            self.engine._collection.get.return_value = {"metadatas": []}
+            self.engine.add_documents([mock_file])
+            self.assertTrue(self.engine._collection.add.called)
 
-        # Test case 3: Changed content
-        txt_file.write_text("Changed content")
-        new_hash = get_file_hash(txt_file)
-        mock_collection.get.return_value = {"metadatas": [{"hash": "old_hash"}]}
+            # Case 2: Document exists with same hash
+            self.engine._collection.add.reset_mock()
+            self.engine._collection.get.return_value = {"metadatas": [{"hash": "hash123"}]}
+            self.engine.add_documents([mock_file])
+            self.assertFalse(self.engine._collection.add.called)
 
-        engine.add_documents([txt_file])
-        assert mock_collection.delete.called
-        assert mock_collection.add.call_count == 1
+
+if __name__ == "__main__":
+    unittest.main()

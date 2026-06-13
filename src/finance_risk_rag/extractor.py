@@ -91,11 +91,7 @@ class BERTExtractor:
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import (
-                AutoModelForTokenClassification,
-                AutoTokenizer,
-                pipeline,
-            )
+            from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
@@ -116,7 +112,9 @@ class BERTExtractor:
     def is_available(self) -> bool:
         return self._nlp is not None
 
-    def _chunk_text(self, text: str, max_length: int = 512, overlap: int = 50) -> List[Tuple[str, int]]:
+    def _chunk_text(
+        self, text: str, max_length: int = 512, overlap: int = 50
+    ) -> List[Tuple[str, int]]:
         """将长文本切分为带偏移量的块"""
         chunks = []
         start = 0
@@ -192,7 +190,9 @@ class EntityExtractionPipeline:
             entities=entities_list, total_risk_score=total_risk, risk_level=risk_level
         )
 
-    def _merge_and_arbitrate(self, rule_entities: List[Entity], bert_entities: List[Entity]) -> List[Entity]:
+    def _merge_and_arbitrate(
+        self, rule_entities: List[Entity], bert_entities: List[Entity]
+    ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理位置重叠。
         优先考虑高分和高置信度的实体。

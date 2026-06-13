@@ -13,7 +13,7 @@ import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
 
 from .config import get_config
-from .exceptions import OCRError, LLMError
+from .exceptions import LLMError, OCRError
 from .llm import LLMClientWrapper
 from .models import ClassificationResult
 from .utils import get_file_hash, load_json_file, save_json_file
@@ -35,7 +35,9 @@ class DocumentProcessor:
             if Path(self.config.tesseract_cmd).exists() or self.config.tesseract_cmd == "tesseract":
                 pytesseract.pytesseract.tesseract_cmd = self.config.tesseract_cmd
             else:
-                logger.warning(f"Tesseract command not found: {self.config.tesseract_cmd}. OCR might fail.")
+                logger.warning(
+                    f"Tesseract command not found: {self.config.tesseract_cmd}. OCR might fail."
+                )
 
     def optimize_image_for_ocr(self, image: Image.Image) -> Image.Image:
         try:
@@ -54,7 +56,9 @@ class DocumentProcessor:
 
     def classify_document(self, text_sample: str) -> ClassificationResult:
         if not self.llm_client.is_available:
-            return ClassificationResult(type="未知", confidence=0.0, reason="LLM client not initialized")
+            return ClassificationResult(
+                type="未知", confidence=0.0, reason="LLM client not initialized"
+            )
 
         prompt = f"""
 请判断以下财务文档属于哪一类？输出 JSON 格式。
@@ -184,7 +188,9 @@ class DocumentProcessor:
                     logger.error(f"Failed to process {pdf.name}: {e}")
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                future_to_pdf = {executor.submit(self.process_single_pdf, pdf): pdf for pdf in pdf_files}
+                future_to_pdf = {
+                    executor.submit(self.process_single_pdf, pdf): pdf for pdf in pdf_files
+                }
                 for future in as_completed(future_to_pdf):
                     pdf = future_to_pdf[future]
                     try:

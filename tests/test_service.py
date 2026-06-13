@@ -3,10 +3,12 @@ RiskAnalysisService 单元测试
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
 from pathlib import Path
+from unittest.mock import MagicMock
+
+from src.finance_risk_rag.models import Entity, ExtractionResult
 from src.finance_risk_rag.service import RiskAnalysisService
-from src.finance_risk_rag.models import ExtractionResult, Entity, ClassificationResult
+
 
 class TestRiskAnalysisService(unittest.TestCase):
     def setUp(self):
@@ -14,9 +16,7 @@ class TestRiskAnalysisService(unittest.TestCase):
         self.mock_processor = MagicMock()
         self.mock_extractor = MagicMock()
         self.service = RiskAnalysisService(
-            config=self.mock_config,
-            processor=self.mock_processor,
-            extractor=self.mock_extractor
+            config=self.mock_config, processor=self.mock_processor, extractor=self.mock_extractor
         )
 
     def test_run_full_analysis(self):
@@ -25,14 +25,12 @@ class TestRiskAnalysisService(unittest.TestCase):
         self.mock_processor.process_single_pdf.return_value = {
             "text": "sample text",
             "classification": {"type": "审计报告", "confidence": 0.9, "reason": "test"},
-            "hash": "abc"
+            "hash": "abc",
         }
 
         mock_entities = [Entity(type="RISK", text="debt", risk_score=30, confidence=0.8)]
         self.mock_extractor.process.return_value = ExtractionResult(
-            entities=mock_entities,
-            total_risk_score=30,
-            risk_level="低风险"
+            entities=mock_entities, total_risk_score=30, risk_level="低风险"
         )
 
         # 执行
@@ -58,9 +56,15 @@ class TestRiskAnalysisService(unittest.TestCase):
                 "total_risk_score": 45,
                 "total_entities": 1,
                 "entities": [
-                    {"type": "RISK", "text": "bad debt", "risk_score": 45, "confidence": 0.85, "source": "bert"}
-                ]
-            }
+                    {
+                        "type": "RISK",
+                        "text": "bad debt",
+                        "risk_score": 45,
+                        "confidence": 0.85,
+                        "source": "bert",
+                    }
+                ],
+            },
         }
 
         # 执行
@@ -71,6 +75,7 @@ class TestRiskAnalysisService(unittest.TestCase):
         self.assertIn("中风险", report)
         self.assertIn("bad debt", report)
         self.assertIn("💡 **建议**", report)
+
 
 if __name__ == "__main__":
     unittest.main()

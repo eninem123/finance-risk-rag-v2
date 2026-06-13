@@ -69,6 +69,7 @@ def main():
 
         result = pipeline.process(input_path)
         from src.finance_risk_rag.utils import save_json_file
+
         save_json_file(result.to_dict(), Path(args.output))
         print(f"✅ 实体提取完成。风险等级: {result.risk_level}, 总分: {result.total_risk_score}")
         print(f"结果已保存至 {args.output}")

@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional
 
 from .config import Config, get_config
 from .extractor import EntityExtractionPipeline
-from .models import ExtractionResult
 from .processor import DocumentProcessor
 from .utils import save_json_file
 
@@ -60,7 +59,9 @@ class RiskAnalysisService:
 
         return analysis_data
 
-    def generate_report(self, analysis_data: Dict[str, Any], output_path: Optional[Path] = None) -> str:
+    def generate_report(
+        self, analysis_data: Dict[str, Any], output_path: Optional[Path] = None
+    ) -> str:
         """
         根据分析数据生成 Markdown 格式的风险报告
         """
@@ -85,13 +86,18 @@ class RiskAnalysisService:
 | :--- | :--- | :--- | :--- | :--- |
 """
         for entity in risk["entities"]:
-            report += f"| {entity['type']} | {entity['text']} | {entity['risk_score']} | {entity['confidence']:.2f} | {entity['source']} |\n"
+            report += (
+                f"| {entity['type']} | {entity['text']} | {entity['risk_score']} | "
+                f"{entity['confidence']:.2f} | {entity['source']} |\n"
+            )
 
         report += "\n## 4. 结论与建议\n"
         if risk["risk_level"] in ["高风险", "极高风险"]:
             report += "⚠️ **建议**: 该文档包含多项高风险因素，建议进行人工深度审计和加强现场尽调。\n"
         elif risk["risk_level"] == "中风险":
-            report += "💡 **建议**: 存在一定风险点，建议关注相关实体的背景情况，必要时要求补充资料。\n"
+            report += (
+                "💡 **建议**: 存在一定风险点，建议关注相关实体的背景情况，" "必要时要求补充资料。\n"
+            )
         else:
             report += "✅ **建议**: 风险较低，可按正常流程处理。\n"
 

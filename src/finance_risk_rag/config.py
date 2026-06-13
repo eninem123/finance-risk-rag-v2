@@ -66,12 +66,14 @@ class Config:
     risk_level_high: int = 90
 
     # BERT 实体类型分值映射
-    bert_risk_mapping: Dict[str, int] = field(default_factory=lambda: {
-        "RISK": 30,
-        "MONEY": 25,
-        "ORG": 15,
-        "PER": 5,
-    })
+    bert_risk_mapping: Dict[str, int] = field(
+        default_factory=lambda: {
+            "RISK": 30,
+            "MONEY": 25,
+            "ORG": 15,
+            "PER": 5,
+        }
+    )
 
     # ==================== 处理配置 ====================
 

@@ -1,0 +1,10 @@
+{
+  "test.pdf": {
+    "hash": "h1",
+    "ocr_version": "v1",
+    "classification": {
+      "type": "A"
+    },
+    "ocr_pages": 0
+  }
+}

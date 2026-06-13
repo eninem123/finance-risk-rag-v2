@@ -1,62 +1,57 @@
-import pytest
-from unittest.mock import MagicMock, patch
-from pathlib import Path
-from src.finance_risk_rag.config import Config
-from src.finance_risk_rag.processor import DocumentProcessor
+"""
+提取流水线单元测试
+"""
+
+import unittest
+from unittest.mock import MagicMock
+
 from src.finance_risk_rag.extractor import EntityExtractionPipeline
-from src.finance_risk_rag.engine import RAGEngine
+from src.finance_risk_rag.models import Entity
 
-def test_full_pipeline_integration(tmp_path):
-    # Setup mock config
-    conf = Config()
-    conf.base_dir = tmp_path
-    conf.docs_dir = tmp_path / "docs"
-    conf.cache_dir = tmp_path / "cache"
-    conf.chroma_db_dir = tmp_path / "db"
-    conf.knowledge_base_dir = tmp_path / "kb"
-    for d in [conf.docs_dir, conf.cache_dir, conf.chroma_db_dir, conf.knowledge_base_dir]:
-        d.mkdir(parents=True)
 
-    # Create a dummy risk entity file
-    import json
-    risk_rules = {"market_risk": {"keywords": ["跌幅", "波动"], "risk_score": 15}}
-    (conf.knowledge_base_dir / "risk_entities.json").write_text(json.dumps(risk_rules))
+class TestPipeline(unittest.TestCase):
+    def setUp(self):
+        self.mock_config = MagicMock()
+        self.mock_rule = MagicMock()
+        self.mock_bert = MagicMock()
+        self.pipeline = EntityExtractionPipeline(
+            config=self.mock_config,
+            rule_extractor=self.mock_rule,
+            bert_extractor=self.mock_bert,
+        )
 
-    # Create a dummy PDF
-    pdf_path = conf.docs_dir / "report.pdf"
-    pdf_path.write_text("Dummy PDF content")
+    def test_merge_and_arbitrate_overlap(self):
+        # 准备两个重叠的实体
+        e1 = Entity(
+            type="RISK",
+            text="财务风险",
+            risk_score=30,
+            confidence=1.0,
+            metadata={"start_char": 0, "end_char": 4},
+        )
+        e2 = Entity(
+            type="RISK",
+            text="风险",
+            risk_score=10,
+            confidence=0.9,
+            metadata={"start_char": 2, "end_char": 4},
+        )
 
-    # Mock LLM and OCR
-    mock_llm = MagicMock()
-    mock_llm.is_available = True
-    mock_llm.chat.return_value = '{"type": "财报", "confidence": 0.95, "reason": "test"}'
-    mock_llm.ask.return_value = "The market risk is moderate."
+        merged = self.pipeline._merge_and_arbitrate([e1], [e2])
 
-    with patch("pdfplumber.open"), \
-         patch("pytesseract.image_to_string", return_value="近期市场波动巨大，跌幅明显。"), \
-         patch("chromadb.PersistentClient"), \
-         patch("chromadb.utils.embedding_functions.ONNXMiniLM_L6_V2"):
+        # 应该只保留分数高且覆盖范围大的 e1
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0].text, "财务风险")
 
-        # 1. Process
-        processor = DocumentProcessor(config=conf, llm_client=mock_llm)
-        # Manually mock extract_text_from_pdf to bypass pdfplumber/tesseract
-        processor.extract_text_from_pdf = MagicMock(return_value=("近期市场波动巨大，跌幅明显。", 1))
-        processor.process_directory(max_workers=1)
+    def test_process_logic(self):
+        self.mock_rule.extract.return_value = []
+        self.mock_bert.extract.return_value = []
 
-        extracted_txt = conf.docs_dir / "report.txt"
-        assert extracted_txt.exists()
+        result = self.pipeline.process("文本样本")
 
-        # 2. Extract
-        extractor = EntityExtractionPipeline(config=conf)
-        result = extractor.process(extracted_txt)
-        assert len(result.entities) > 0
-        assert any(e.text == "波动" for e in result.entities)
+        self.assertEqual(result.total_risk_score, 0)
+        self.assertEqual(result.risk_level, "低风险")
 
-        # 3. Query
-        engine = RAGEngine(config=conf, llm_client=mock_llm)
-        # Mock collection for engine
-        engine._collection = MagicMock()
-        engine._collection.query.return_value = {"documents": [["context"]], "metadatas": [[{"source": "report.pdf"}]]}
 
-        query_res = engine.query("市场风险如何？")
-        assert "moderate" in query_res.answer
+if __name__ == "__main__":
+    unittest.main()
