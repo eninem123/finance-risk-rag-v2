@@ -20,7 +20,9 @@ class TestDocumentProcessor(unittest.TestCase):
 
     def test_classify_document(self):
         # Mock LLM response
-        self.mock_llm.chat.return_value = '{"type": "审计报告", "confidence": 0.95, "reason": "test"}'
+        self.mock_llm.chat.return_value = (
+            '{"type": "审计报告", "confidence": 0.95, "reason": "test"}'
+        )
 
         result = self.processor.classify_document("Sample financial text...")
 
