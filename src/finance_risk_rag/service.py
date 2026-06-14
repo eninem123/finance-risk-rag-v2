@@ -7,7 +7,7 @@ Finance-Risk-RAG 编排服务模块
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from .config import get_config
 from .engine import RAGEngine

@@ -105,11 +105,7 @@ class BERTExtractor:
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import (
-                AutoModelForTokenClassification,
-                AutoTokenizer,
-                pipeline,
-            )
+            from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
@@ -130,7 +126,9 @@ class BERTExtractor:
     def is_available(self) -> bool:
         return self.model is not None
 
-    def _chunk_text(self, text: str, max_length: int = 510, overlap: int = 50) -> List[Tuple[str, int]]:
+    def _chunk_text(
+        self, text: str, max_length: int = 510, overlap: int = 50
+    ) -> List[Tuple[str, int]]:
         """将长文本切分为带重叠的块"""
         chunks = []
         start = 0
@@ -221,7 +219,9 @@ class EntityExtractionPipeline:
             entities=entities_list, total_risk_score=total_risk, risk_level=risk_level
         )
 
-    def _merge_and_arbitrate(self, rule_entities: List[Entity], bert_entities: List[Entity]) -> List[Entity]:
+    def _merge_and_arbitrate(
+        self, rule_entities: List[Entity], bert_entities: List[Entity]
+    ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理重叠。
         基于字符位置进行冲突仲裁，优先保留长实体和高置信度实体。
@@ -247,12 +247,15 @@ class EntityExtractionPipeline:
                     continue
 
                 # 检测重叠： [start1, end1] vs [start2, end2]
-                if not (current.end_char <= existing.start_char or current.start_char >= existing.end_char):
+                if not (
+                    current.end_char <= existing.start_char
+                    or current.start_char >= existing.end_char
+                ):
                     # 发生重叠
                     # 仲裁：如果当前实体得分远高于已有实体，或者已有实体完全被当前包含
                     if current.risk_score > existing.risk_score * 1.5:
                         final_entities.remove(existing)
-                        is_overlapped = False # 继续添加当前
+                        is_overlapped = False  # 继续添加当前
                         break
                     else:
                         is_overlapped = True

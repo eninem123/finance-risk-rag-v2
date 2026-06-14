@@ -82,7 +82,9 @@ def main():
             report = service.analyze_document(input_path)
             # 格式化输出简要报告
             print(f"\n--- 风险分析报告: {report['document']['name']} ---")
-            print(f"文档类型: {report['document']['type']} (置信度: {report['document']['confidence']:.2f})")
+            print(
+                f"文档类型: {report['document']['type']} (置信度: {report['document']['confidence']:.2f})"
+            )
             print(f"风险等级: {report['risk_analysis']['risk_level']}")
             print(f"风险得分: {report['risk_analysis']['total_risk_score']}")
             print(f"发现实体数: {report['risk_analysis']['total_entities']}")
@@ -90,7 +92,9 @@ def main():
         else:
             print(f"正在批量处理目录: {input_path}...")
             reports = service.generate_batch_report(input_path)
-            print(f"处理完成。共生成 {len(reports)} 份分析报告。结果已保存至 {input_path / 'risk_report_batch.json'}")
+            print(
+                f"处理完成。共生成 {len(reports)} 份分析报告。结果已保存至 {input_path / 'risk_report_batch.json'}"
+            )
 
     else:
         parser.print_help()

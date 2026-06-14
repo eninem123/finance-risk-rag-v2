@@ -1,17 +1,17 @@
-import os
 import sys
 from pathlib import Path
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
-# 添加 src 到路径
+# 添加 src 到路径以方便导入
 sys.path.append(str(Path(__file__).parent / "src"))
 
-from finance_risk_rag.config import get_config
-from finance_risk_rag.service import RiskAnalysisService
+from finance_risk_rag.config import get_config  # noqa: E402
+from finance_risk_rag.service import RiskAnalysisService  # noqa: E402
 
 st.set_page_config(page_title="Finance-Risk-RAG Dashboard", layout="wide")
+
 
 def main():
     st.title("🏦 Finance-Risk-RAG 智能风控仪表盘")
@@ -55,7 +55,10 @@ def main():
                     if entities:
                         st.write("### 🚩 识别到的风险点")
                         df = pd.DataFrame(entities)
-                        st.dataframe(df[["type", "text", "risk_score", "confidence", "source"]], use_container_width=True)
+                        st.dataframe(
+                            df[["type", "text", "risk_score", "confidence", "source"]],
+                            use_container_width=True,
+                        )
                     else:
                         st.success("未发现预定义风险点。")
                 except Exception as e:
@@ -77,6 +80,7 @@ def main():
                 if result.sources:
                     with st.expander("查看参考来源"):
                         st.json(result.sources)
+
 
 if __name__ == "__main__":
     main()

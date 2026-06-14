@@ -100,7 +100,11 @@ def split_text_by_sentence(text: str, max_len: int = 400, min_len: int = 50) -> 
 
     if current_chunk:
         # 如果最后一个块太短，尝试合并到上一个块（如果可能）
-        if chunks and len(current_chunk) < min_len and len(chunks[-1]) + len(current_chunk) <= max_len:
+        if (
+            chunks
+            and len(current_chunk) < min_len
+            and len(chunks[-1]) + len(current_chunk) <= max_len
+        ):
             chunks[-1] += " " + current_chunk
         else:
             chunks.append(current_chunk)

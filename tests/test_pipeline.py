@@ -1,10 +1,10 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from pathlib import Path
+
 from src.finance_risk_rag.config import Config
-from src.finance_risk_rag.processor import DocumentProcessor
-from src.finance_risk_rag.extractor import EntityExtractionPipeline
 from src.finance_risk_rag.engine import RAGEngine
+from src.finance_risk_rag.extractor import EntityExtractionPipeline
+from src.finance_risk_rag.processor import DocumentProcessor
+
 
 def test_full_pipeline_integration(tmp_path):
     # Setup mock config
@@ -19,6 +19,7 @@ def test_full_pipeline_integration(tmp_path):
 
     # Create a dummy risk entity file
     import json
+
     risk_rules = {"market_risk": {"keywords": ["跌幅", "波动"], "risk_score": 15}}
     (conf.knowledge_base_dir / "risk_entities.json").write_text(json.dumps(risk_rules))
 
@@ -32,15 +33,18 @@ def test_full_pipeline_integration(tmp_path):
     mock_llm.chat.return_value = '{"type": "财报", "confidence": 0.95, "reason": "test"}'
     mock_llm.ask.return_value = "The market risk is moderate."
 
-    with patch("pdfplumber.open"), \
-         patch("pytesseract.image_to_string", return_value="近期市场波动巨大，跌幅明显。"), \
-         patch("chromadb.PersistentClient"), \
-         patch("chromadb.utils.embedding_functions.ONNXMiniLM_L6_V2"):
+    with patch("pdfplumber.open"), patch(
+        "pytesseract.image_to_string", return_value="近期市场波动巨大，跌幅明显。"
+    ), patch("chromadb.PersistentClient"), patch(
+        "chromadb.utils.embedding_functions.ONNXMiniLM_L6_V2"
+    ):
 
         # 1. Process
         processor = DocumentProcessor(config=conf, llm_client=mock_llm)
         # Manually mock extract_text_from_pdf to bypass pdfplumber/tesseract
-        processor.extract_text_from_pdf = MagicMock(return_value=("近期市场波动巨大，跌幅明显。", 1))
+        processor.extract_text_from_pdf = MagicMock(
+            return_value=("近期市场波动巨大，跌幅明显。", 1)
+        )
         processor.process_directory(max_workers=1)
 
         extracted_txt = conf.docs_dir / "report.txt"
@@ -56,7 +60,10 @@ def test_full_pipeline_integration(tmp_path):
         engine = RAGEngine(config=conf, llm_client=mock_llm)
         # Mock collection for engine
         engine._collection = MagicMock()
-        engine._collection.query.return_value = {"documents": [["context"]], "metadatas": [[{"source": "report.pdf"}]]}
+        engine._collection.query.return_value = {
+            "documents": [["context"]],
+            "metadatas": [[{"source": "report.pdf"}]],
+        }
 
         query_res = engine.query("市场风险如何？")
         assert "moderate" in query_res.answer
