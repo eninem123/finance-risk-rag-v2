@@ -2,9 +2,9 @@ from unittest.mock import patch
 
 import pytest
 
-from finance_risk_rag.config import Config
-from finance_risk_rag.models import Entity, ExtractionResult
-from finance_risk_rag.service import RiskAnalysisService
+from src.finance_risk_rag.config import Config
+from src.finance_risk_rag.models import Entity, ExtractionResult
+from src.finance_risk_rag.service import RiskAnalysisService
 
 
 @pytest.fixture
@@ -22,8 +22,8 @@ def test_service_initialization(mock_config):
     assert service.rag_engine is not None
 
 
-@patch("finance_risk_rag.processor.DocumentProcessor.process_single_pdf")
-@patch("finance_risk_rag.extractor.EntityExtractionPipeline.process")
+@patch("src.finance_risk_rag.processor.DocumentProcessor.process_single_pdf")
+@patch("src.finance_risk_rag.extractor.EntityExtractionPipeline.process")
 def test_analyze_document(mock_extract, mock_process, mock_config):
     service = RiskAnalysisService(mock_config)
     pdf_path = mock_config.docs_dir / "test.pdf"
