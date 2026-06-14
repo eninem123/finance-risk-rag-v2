@@ -50,22 +50,26 @@ class DocumentProcessor:
             return ClassificationResult(type="未知", confidence=0.0, reason="LLM unavailable")
 
         prompt = f"""
-请判断以下财务文档属于哪一类？输出 JSON 格式。
+你是一个专业的金融文档分类专家。请分析以下文本样本，并将其归类为最合适的金融文档类型。
 
-文本样本：
+文本样本（前3000字）：
 {text_sample[:3000]}
 
-【可选类别】
-1. 审计报告
-2. 行业报告
-3. 公司研究报告
-4. 上市手册
-5. 财报
-6. 其他
+【候选类别】
+- 审计报告 (Audit Report): 包含会计师事务所意见、财务报表审计。
+- 行业报告 (Industry Report): 对特定行业的发展、竞争格局进行的深度分析。
+- 公司研究报告 (Company Research): 针对特定上市公司的基本面分析、估值与建议。
+- 上市手册/招股书 (Prospectus): 包含公司历史、业务、风险因素、募集资金用途。
+- 定期财报 (Financial Statement): 季度、半年度或年度财务数据披露。
+- 其他 (Other): 不属于上述类别的文档。
 
 【输出要求】
-- 仅输出 JSON 格式
-- 示例：{{"type": "行业报告", "confidence": 0.93, "reason": "..."}}
+- 必须严格输出 JSON 格式。
+- 包含字段：type (类别名称), confidence (置信度0-1), reason (简短理由)。
+- 不要输出任何其他解释性文本。
+
+示例：
+{{"type": "审计报告", "confidence": 0.98, "reason": "文本中包含审计意见及资产负债表信息"}}
 """
         try:
             import json
@@ -105,8 +109,8 @@ class DocumentProcessor:
             logger.error(f"Error processing {pdf_path}: {e}")
             raise OCRError(f"PDF extraction failed for {pdf_path}: {e}")
 
-    def _process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
-        """处理单个 PDF 的内部方法，用于并行化"""
+    def process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
+        """处理单个 PDF 的方法"""
         file_hash = get_file_hash(pdf_path)
         log = load_json_file(self.config.processing_log_path)
         cached = log.get(pdf_path.name, {})
@@ -154,12 +158,12 @@ class DocumentProcessor:
         if max_workers <= 1:
             for pdf in pdf_files:
                 try:
-                    results.append(self._process_single_pdf(pdf))
+                    results.append(self.process_single_pdf(pdf))
                 except Exception as e:
                     logger.error(f"Failed to process {pdf.name}: {e}")
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                future_to_pdf = {executor.submit(self._process_single_pdf, pdf): pdf for pdf in pdf_files}
+                future_to_pdf = {executor.submit(self.process_single_pdf, pdf): pdf for pdf in pdf_files}
                 for future in as_completed(future_to_pdf):
                     try:
                         res = future.result()
