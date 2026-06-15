@@ -37,10 +37,10 @@ class DocumentProcessor:
     def optimize_image_for_ocr(self, image: Image.Image) -> Image.Image:
         image = image.convert("L")
         image = image.filter(ImageFilter.MedianFilter(size=3))
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(1.2)
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(2.5)
+        enhancer_b = ImageEnhance.Brightness(image)
+        image = enhancer_b.enhance(1.2)
+        enhancer_c = ImageEnhance.Contrast(image)
+        image = enhancer_c.enhance(2.5)
         image = image.filter(ImageFilter.SHARPEN)
         image = image.point(lambda x: 0 if x < 140 else 255, "1")
         return image
@@ -73,6 +73,8 @@ class DocumentProcessor:
             response = self.llm_client.chat([{"role": "user", "content": prompt}], temperature=0.2)
             start = response.find("{")
             end = response.rfind("}") + 1
+            if start == -1 or end == 0:
+                raise ValueError("No JSON found in response")
             data = json.loads(response[start:end])
             return ClassificationResult(
                 type=data.get("type", "其他"),
@@ -105,8 +107,8 @@ class DocumentProcessor:
             logger.error(f"Error processing {pdf_path}: {e}")
             raise OCRError(f"PDF extraction failed for {pdf_path}: {e}")
 
-    def _process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
-        """处理单个 PDF 的内部方法，用于并行化"""
+    def process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
+        """处理单个 PDF，支持缓存检查"""
         file_hash = get_file_hash(pdf_path)
         log = load_json_file(self.config.processing_log_path)
         cached = log.get(pdf_path.name, {})
@@ -154,12 +156,12 @@ class DocumentProcessor:
         if max_workers <= 1:
             for pdf in pdf_files:
                 try:
-                    results.append(self._process_single_pdf(pdf))
+                    results.append(self.process_single_pdf(pdf))
                 except Exception as e:
                     logger.error(f"Failed to process {pdf.name}: {e}")
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                future_to_pdf = {executor.submit(self._process_single_pdf, pdf): pdf for pdf in pdf_files}
+                future_to_pdf = {executor.submit(self.process_single_pdf, pdf): pdf for pdf in pdf_files}
                 for future in as_completed(future_to_pdf):
                     try:
                         res = future.result()
@@ -168,7 +170,6 @@ class DocumentProcessor:
                         pdf = future_to_pdf[future]
                         logger.error(f"Failed to process {pdf.name}: {e}")
 
-        # 聚合结果并更新日志 (保持某种程度的顺序以便合并)
         # Sort by name to keep all_extracted.txt consistent
         results.sort(key=lambda x: x["name"])
 
