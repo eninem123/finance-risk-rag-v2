@@ -10,8 +10,8 @@ import streamlit as st
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
 from finance_risk_rag.config import get_config  # noqa: E402
-from finance_risk_rag.service import RiskAnalysisService  # noqa: E402
 from finance_risk_rag.engine import RAGEngine  # noqa: E402
+from finance_risk_rag.service import RiskAnalysisService  # noqa: E402
 
 st.set_page_config(page_title="Finance-Risk-RAG Dashboard", layout="wide")
 
