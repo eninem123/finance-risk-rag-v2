@@ -7,7 +7,7 @@ Finance-Risk-RAG 风险分析服务
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from .config import Config, get_config
 from .engine import RAGEngine
@@ -56,16 +56,10 @@ class RiskAnalysisService:
             "risk_assessment": {
                 "level": ext_res.risk_level,
                 "score": ext_res.total_risk_score,
-                "entities": [e.to_dict() for e in ext_res.entities]
+                "entities": [e.to_dict() for e in ext_res.entities],
             },
-            "ai_analysis": {
-                "summary": rag_res.answer,
-                "sources": rag_res.sources
-            },
-            "metadata": {
-                "ocr_pages": proc_res["ocr_pages"],
-                "file_hash": proc_res["hash"]
-            }
+            "ai_analysis": {"summary": rag_res.answer, "sources": rag_res.sources},
+            "metadata": {"ocr_pages": proc_res["ocr_pages"], "file_hash": proc_res["hash"]},
         }
 
         return report
@@ -75,26 +69,26 @@ class RiskAnalysisService:
         生成 Markdown 格式的风险报告。
         """
         md = f"# 财务风险分析报告: {report['document_name']}\n\n"
-        md += f"## 1. 文档概览\n"
+        md += "## 1. 文档概览\n"
         md += f"- **文档类型**: {report['classification']['type']}\n"
         md += f"- **分类置信度**: {report['classification']['confidence']:.2f}\n"
         md += f"- **OCR 页数**: {report['metadata']['ocr_pages']}\n\n"
 
-        md += f"## 2. 风险评估\n"
+        md += "## 2. 风险评估\n"
         md += f"- **综合风险等级**: **{report['risk_assessment']['level']}**\n"
         md += f"- **量化风险评分**: {report['risk_assessment']['score']}\n\n"
 
         md += "### 2.1 识别出的关键风险实体\n"
-        if not report['risk_assessment']['entities']:
+        if not report["risk_assessment"]["entities"]:
             md += "未识别到明显的风险实体。\n"
         else:
             md += "| 类型 | 实体 | 分数 | 来源 | 上下文 |\n"
             md += "| --- | --- | --- | --- | --- |\n"
-            for e in report['risk_assessment']['entities'][:20]: # 限制前20个
-                ctx = e['context'][:50] + "..." if len(e['context']) > 50 else e['context']
+            for e in report["risk_assessment"]["entities"][:20]:  # 限制前20个
+                ctx = e["context"][:50] + "..." if len(e["context"]) > 50 else e["context"]
                 md += f"| {e['type']} | {e['text']} | {e['risk_score']} | {e['source']} | {ctx} |\n"
 
-        md += f"\n## 3. AI 深度分析\n"
+        md += "\n## 3. AI 深度分析\n"
         md += f"{report['ai_analysis']['summary']}\n\n"
 
         md += "---\n*报告由 Finance-Risk-RAG 系统自动生成*"

@@ -35,7 +35,12 @@ class DefaultScoringStrategy(ScoringStrategy):
 class RuleBasedExtractor:
     """基于规则的实体提取器"""
 
-    def __init__(self, config=None, rules_path: Optional[Path] = None, scoring_strategy: Optional[ScoringStrategy] = None):
+    def __init__(
+        self,
+        config=None,
+        rules_path: Optional[Path] = None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
         self.config = config or get_config()
         self.rules = {}
         self.scoring_strategy = scoring_strategy or DefaultScoringStrategy()
@@ -95,7 +100,9 @@ class RuleBasedExtractor:
 class BERTExtractor:
     """基于 BERT 的实体提取器"""
 
-    def __init__(self, model_path: Optional[Path] = None, scoring_strategy: Optional[ScoringStrategy] = None):
+    def __init__(
+        self, model_path: Optional[Path] = None, scoring_strategy: Optional[ScoringStrategy] = None
+    ):
         self.model = None
         self.tokenizer = None
         self.device = None
@@ -106,11 +113,7 @@ class BERTExtractor:
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import (
-                AutoModelForTokenClassification,
-                AutoTokenizer,
-                pipeline,
-            )
+            from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
@@ -131,7 +134,9 @@ class BERTExtractor:
     def is_available(self) -> bool:
         return self.model is not None
 
-    def _chunk_text(self, text: str, max_length: int = 512, overlap: int = 50) -> List[Tuple[str, int]]:
+    def _chunk_text(
+        self, text: str, max_length: int = 512, overlap: int = 50
+    ) -> List[Tuple[str, int]]:
         """将长文本切分为带偏移量的块"""
         chunks = []
         start = 0
@@ -208,7 +213,9 @@ class EntityExtractionPipeline:
             entities=entities_list, total_risk_score=total_risk, risk_level=risk_level
         )
 
-    def _merge_and_arbitrate(self, rule_entities: List[Entity], bert_entities: List[Entity]) -> List[Entity]:
+    def _merge_and_arbitrate(
+        self, rule_entities: List[Entity], bert_entities: List[Entity]
+    ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，利用字符偏移量处理重叠。
         优先考虑高分和覆盖范围较大的实体。
@@ -226,7 +233,10 @@ class EntityExtractionPipeline:
             is_redundant = False
             for existing in final_entities:
                 # 检查字符偏移量是否有重叠
-                if not (current.end_char <= existing.start_char or current.start_char >= existing.end_char):
+                if not (
+                    current.end_char <= existing.start_char
+                    or current.start_char >= existing.end_char
+                ):
                     # 存在重叠，既然我们已经排过序了，当前的更可能是冗余的
                     is_redundant = True
                     break

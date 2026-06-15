@@ -1,16 +1,17 @@
-import streamlit as st
-import pandas as pd
-from pathlib import Path
 import json
-import sys
 import os
+import sys
+from pathlib import Path
+
+import pandas as pd
+import streamlit as st
 
 # 确保可以导入 src
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
-from finance_risk_rag.config import get_config
-from finance_risk_rag.service import RiskAnalysisService
-from finance_risk_rag.engine import RAGEngine
+from finance_risk_rag.config import get_config  # noqa: E402
+from finance_risk_rag.service import RiskAnalysisService  # noqa: E402
+from finance_risk_rag.engine import RAGEngine  # noqa: E402
 
 st.set_page_config(page_title="Finance-Risk-RAG Dashboard", layout="wide")
 
@@ -74,7 +75,9 @@ with tab3:
     st.header("🧠 知识库问答 (RAG)")
     engine = RAGEngine(config)
 
-    question = st.text_input("针对已处理的文档提出问题：", placeholder="例如：该公司的流动比率是否存在异常？")
+    question = st.text_input(
+        "针对已处理的文档提出问题：", placeholder="例如：该公司的流动比率是否存在异常？"
+    )
 
     if question:
         with st.spinner("检索并生成回答中..."):

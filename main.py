@@ -55,6 +55,7 @@ def main():
         pipeline = EntityExtractionPipeline(config)
         result = pipeline.process(Path(args.input))
         from src.finance_risk_rag.utils import save_json_file
+
         save_json_file(result.to_dict(), Path(args.output))
         print(f"实体提取完成。风险等级: {result.risk_level}, 总分: {result.total_risk_score}")
 
@@ -77,6 +78,7 @@ def main():
             report = service.analyze_document(input_path)
             output_dir.mkdir(parents=True, exist_ok=True)
             from src.finance_risk_rag.utils import save_json_file
+
             save_json_file(report, output_dir / f"{input_path.stem}_report.json")
             md_content = service.generate_report_markdown(report)
             (output_dir / f"{input_path.stem}_report.md").write_text(md_content, encoding="utf-8")

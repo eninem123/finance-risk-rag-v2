@@ -161,7 +161,9 @@ class DocumentProcessor:
                     logger.error(f"Failed to process {pdf.name}: {e}")
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                future_to_pdf = {executor.submit(self.process_single_pdf, pdf): pdf for pdf in pdf_files}
+                future_to_pdf = {
+                    executor.submit(self.process_single_pdf, pdf): pdf for pdf in pdf_files
+                }
                 for future in as_completed(future_to_pdf):
                     try:
                         res = future.result()
