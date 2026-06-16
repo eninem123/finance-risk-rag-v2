@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from pathlib import Path
+
+import pytest
+
 from src.finance_risk_rag.engine import RAGEngine
+
 
 @pytest.fixture
 def mock_engine_config(tmp_path):
@@ -13,11 +15,12 @@ def mock_engine_config(tmp_path):
     conf.llm_api_key = "test"
     return conf
 
+
 def test_engine_incremental_indexing(mock_engine_config):
     # Mock chromadb
-    with patch("chromadb.PersistentClient"), \
-         patch("chromadb.utils.embedding_functions.ONNXMiniLM_L6_V2"), \
-         patch("src.finance_risk_rag.engine.LLMClientWrapper"):
+    with patch("chromadb.PersistentClient"), patch(
+        "chromadb.utils.embedding_functions.ONNXMiniLM_L6_V2"
+    ), patch("src.finance_risk_rag.engine.LLMClientWrapper"):
 
         engine = RAGEngine(config=mock_engine_config)
         mock_collection = MagicMock()
@@ -33,6 +36,7 @@ def test_engine_incremental_indexing(mock_engine_config):
 
         # Test case 2: Unchanged content
         from src.finance_risk_rag.utils import get_file_hash
+
         file_hash = get_file_hash(txt_file)
         mock_collection.get.return_value = {"metadatas": [{"hash": file_hash}]}
         mock_collection.add.reset_mock()
@@ -42,7 +46,6 @@ def test_engine_incremental_indexing(mock_engine_config):
 
         # Test case 3: Changed content
         txt_file.write_text("Changed content")
-        new_hash = get_file_hash(txt_file)
         mock_collection.get.return_value = {"metadatas": [{"hash": "old_hash"}]}
 
         engine.add_documents([txt_file])

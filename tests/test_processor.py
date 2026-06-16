@@ -1,8 +1,10 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from pathlib import Path
-from src.finance_risk_rag.processor import DocumentProcessor
+
+import pytest
+
 from src.finance_risk_rag.config import Config
+from src.finance_risk_rag.processor import DocumentProcessor
+
 
 @pytest.fixture
 def mock_config(tmp_path):
@@ -13,6 +15,7 @@ def mock_config(tmp_path):
     conf.cache_dir.mkdir()
     return conf
 
+
 def test_processor_parallel_execution(mock_config):
     # Create mock PDF files
     (mock_config.docs_dir / "test1.pdf").write_text("dummy")
@@ -21,8 +24,13 @@ def test_processor_parallel_execution(mock_config):
     processor = DocumentProcessor(config=mock_config)
 
     # Mock extract_text_from_pdf and classify_document
-    with patch.object(DocumentProcessor, "extract_text_from_pdf", return_value=("extracted text", 1)), \
-         patch.object(DocumentProcessor, "classify_document", return_value=MagicMock(to_dict=lambda: {"type": "Report"})):
+    with patch.object(
+        DocumentProcessor, "extract_text_from_pdf", return_value=("extracted text", 1)
+    ), patch.object(
+        DocumentProcessor,
+        "classify_document",
+        return_value=MagicMock(to_dict=lambda: {"type": "Report"}),
+    ):
 
         processor.process_directory(max_workers=2)
 

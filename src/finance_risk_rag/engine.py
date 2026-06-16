@@ -5,7 +5,7 @@ Finance-Risk-RAG RAG 引擎模块
 
 import logging
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List, cast
 
 import chromadb
 from chromadb.utils import embedding_functions as ef
@@ -60,9 +60,10 @@ class RAGEngine:
                     existing = self._collection.get(
                         where={"source": txt_file.name}, include=["metadatas"]
                     )
-                    if existing and existing["metadatas"]:
+                    metadatas = cast(List[Dict[str, Any]], existing.get("metadatas", []))
+                    if metadatas:
                         # 检查第一个 chunk 的 hash 是否一致
-                        if existing["metadatas"][0].get("hash") == current_hash:
+                        if metadatas[0].get("hash") == current_hash:
                             logger.info(f"Skipping indexing for {txt_file.name} (unchanged)")
                             continue
                         else:
@@ -75,18 +76,18 @@ class RAGEngine:
                 sentences = split_text_by_sentence(cleaned, max_len=self.config.chunk_size)
 
                 documents = []
-                metadatas = []
+                metadatas_to_add = []
                 ids = []
 
                 for i, sent in enumerate(sentences):
                     documents.append(sent)
-                    metadatas.append(
+                    metadatas_to_add.append(
                         {"source": txt_file.name, "chunk_index": i, "hash": current_hash}
                     )
                     ids.append(f"{txt_file.name}_{i}")
 
                 if documents:
-                    self._collection.add(documents=documents, metadatas=metadatas, ids=ids)
+                    self._collection.add(documents=documents, metadatas=metadatas_to_add, ids=ids)
                     logger.info(f"Indexed {len(documents)} chunks from {txt_file.name}")
             except Exception as e:
                 logger.error(f"Failed to index {txt_file}: {e}")
@@ -95,8 +96,14 @@ class RAGEngine:
         try:
             results = self._collection.query(query_texts=[question], n_results=top_k)
 
-            docs = results.get("documents", [[]])[0]
-            metas = results.get("metadatas", [[]])[0]
+            documents = results.get("documents", [[]])
+            metadatas = results.get("metadatas", [[]])
+
+            if not documents or not documents[0]:
+                return QueryResult(answer="未找到相关信息。", sources=[], confidence=0.0)
+
+            docs = documents[0]
+            metas = cast(List[Dict[str, Any]], metadatas[0])
 
             context = "\n\n".join(docs)
             answer = self.llm_client.ask(question, context)
