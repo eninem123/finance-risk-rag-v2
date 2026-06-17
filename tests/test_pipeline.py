@@ -1,7 +1,4 @@
-from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from src.finance_risk_rag.config import Config
 from src.finance_risk_rag.engine import RAGEngine

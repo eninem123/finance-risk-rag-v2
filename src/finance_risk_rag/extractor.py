@@ -35,8 +35,14 @@ class DefaultScoringStrategy(ScoringStrategy):
 class RuleBasedExtractor:
     """基于规则的实体提取器"""
 
-    def __init__(self, config=None, rules_path: Optional[Path] = None):
+    def __init__(
+        self,
+        config=None,
+        rules_path: Optional[Path] = None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
         self.config = config or get_config()
+        self.scoring_strategy = scoring_strategy or DefaultScoringStrategy()
         self.rules: Dict[str, Any] = {}
         if rules_path:
             self.load_rules(rules_path)
@@ -76,11 +82,12 @@ class RuleBasedExtractor:
                     context_end = min(len(text), end + 80)
                     context = text[context_start:context_end].replace("\n", " ").strip()
 
+                    risk_score = self.scoring_strategy.calculate(entity_type, 1.0, base_risk_score)
                     entities.append(
                         Entity(
                             type=entity_type,
                             text=keyword,
-                            risk_score=base_risk_score,
+                            risk_score=risk_score,
                             confidence=1.0,
                             start_char=start,
                             end_char=end,
@@ -94,8 +101,14 @@ class RuleBasedExtractor:
 class BERTExtractor:
     """基于 BERT 的实体提取器"""
 
-    def __init__(self, config=None, model_path: Optional[Path] = None):
+    def __init__(
+        self,
+        config=None,
+        model_path: Optional[Path] = None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
         self.config = config or get_config()
+        self.scoring_strategy = scoring_strategy or DefaultScoringStrategy()
         self.model = None
         self.tokenizer = None
         self.device: Union[int, str] = -1
@@ -127,8 +140,8 @@ class BERTExtractor:
             logger.warning(f"Failed to load BERT model: {e}")
             self.model = None
 
-    @property
     def is_available(self) -> bool:
+        """检查模型是否可用"""
         return self.model is not None
 
     def _chunk_text(
@@ -146,7 +159,7 @@ class BERTExtractor:
         return chunks
 
     def extract(self, text: str) -> List[Entity]:
-        if not self.is_available or not text:
+        if not self.is_available() or not text:
             return []
 
         try:
@@ -170,12 +183,15 @@ class BERTExtractor:
 
                     base_score = self.config.bert_risk_scores.get(entity_type, 20)
                     confidence = float(res["score"])
+                    risk_score = self.scoring_strategy.calculate(
+                        entity_type, confidence, base_score
+                    )
 
                     all_entities.append(
                         Entity(
                             type=entity_type,
                             text=word,
-                            risk_score=int(base_score * confidence),
+                            risk_score=risk_score,
                             confidence=confidence,
                             start_char=start_char,
                             end_char=end_char,
@@ -200,9 +216,13 @@ class EntityExtractionPipeline:
         scoring_strategy: Optional[ScoringStrategy] = None,
     ):
         self.config = config or get_config()
-        self.rule_extractor = rule_extractor or RuleBasedExtractor(config=self.config)
-        self.bert_extractor = bert_extractor or BERTExtractor(config=self.config)
         self.scoring_strategy = scoring_strategy or DefaultScoringStrategy()
+        self.rule_extractor = rule_extractor or RuleBasedExtractor(
+            config=self.config, scoring_strategy=self.scoring_strategy
+        )
+        self.bert_extractor = bert_extractor or BERTExtractor(
+            config=self.config, scoring_strategy=self.scoring_strategy
+        )
 
     def process(self, text_or_path: Union[str, Path]) -> ExtractionResult:
         if isinstance(text_or_path, Path):

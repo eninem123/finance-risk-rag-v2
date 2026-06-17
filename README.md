@@ -119,7 +119,7 @@ streamlit run dashboard.py
 # 生成全流程风险报告
 python main.py report --dir ./docs/ --output ./results/risk_report.json
 
-# 处理单个 PDF 文档
+# 处理批量文档 (OCR + 分类)
 python main.py process --dir ./docs/
 
 # 执行 RAG 问答 (先构建索引)

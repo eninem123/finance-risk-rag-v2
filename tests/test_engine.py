@@ -1,4 +1,3 @@
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -47,7 +46,6 @@ def test_engine_incremental_indexing(mock_engine_config):
 
         # Test case 3: Changed content
         txt_file.write_text("Changed content")
-        new_hash = get_file_hash(txt_file)
         mock_collection.get.return_value = {"metadatas": [{"hash": "old_hash"}]}
 
         engine.add_documents([txt_file])

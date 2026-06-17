@@ -6,8 +6,8 @@ src_path = str(Path(__file__).parent / "src")
 if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
-import pandas as pd
-import streamlit as st
+import pandas as pd  # noqa: E402
+import streamlit as st  # noqa: E402
 
 from finance_risk_rag.config import get_config  # noqa: E402
 from finance_risk_rag.service import RiskAnalysisService  # noqa: E402
