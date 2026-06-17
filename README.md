@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏦 Finance-Risk-RAG v2.1
+# 🏦 Finance-Risk-RAG v2.2
 
 **银行级多语言财务文本风控 AI 系统**
 
@@ -49,10 +49,10 @@ Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，专为金�
 - 风险等级自动评估与建议生成
 
 ### 🏗️ 企业级架构
-- 模块化设计，易于集成与扩展
-- 统一配置管理，灵活适配不同场景
-- 完整的异常处理与日志体系
-- 专业 CLI 接口，一键完成全流程
+- **编排服务层 (Service Layer)**：统一协调文档处理、实体提取与 RAG 问答。
+- **混合实体提取**：结合规则引擎与 BERT 深度学习，支持字符级偏移定位。
+- **智能文档分类**：基于 LLM 的 Chain-of-Thought (CoT) 自动化分类。
+- **交互式看板**：基于 Streamlit 的可视化风险监控中心。
 
 ---
 
@@ -113,17 +113,17 @@ python main.py --help
 ### 快速上手
 
 ```bash
+# 启动可视化看板
+streamlit run dashboard.py
+
+# 生成全流程风险报告
+python main.py report --dir ./docs/ --output ./results/risk_report.json
+
 # 处理单个 PDF 文档
-python main.py process --input document.pdf
+python main.py process --dir ./docs/
 
-# 批量处理目录
-python main.py process --input ./docs/ --output ./results/
-
-# 启动 RAG 问答模式
-python main.py rag --knowledge-base ./knowledge_base/
-
-# 交互式查询
-python main.py query "这笔贷款有哪些风险点？"
+# 执行 RAG 问答 (先构建索引)
+python main.py query "这笔贷款有哪些风险点？" --build
 ```
 
 ---

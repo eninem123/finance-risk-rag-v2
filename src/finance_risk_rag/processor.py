@@ -46,30 +46,37 @@ class DocumentProcessor:
         return image
 
     def classify_document(self, text_sample: str) -> ClassificationResult:
+        """使用 LLM 对文档进行分类，包含 CoT 推理"""
         if not self.llm_client.is_available:
             return ClassificationResult(type="未知", confidence=0.0, reason="LLM unavailable")
 
         prompt = f"""
-请判断以下财务文档属于哪一类？输出 JSON 格式。
+你是一名资深金融文档分析师。请分析以下财务文档样本并将其归类。
 
-文本样本：
+【文本样本】
 {text_sample[:3000]}
 
 【可选类别】
-1. 审计报告
-2. 行业报告
-3. 公司研究报告
-4. 上市手册
-5. 财报
-6. 其他
+1. 审计报告 (Audit Report)
+2. 行业报告 (Industry Research)
+3. 公司研究报告 (Company Research)
+4. 上市手册 (Prospectus/Listing Manual)
+5. 财报 (Financial Report)
+6. 其他 (Other)
+
+【分析要求】
+1. 识别文档中的关键特征（如标题、主要章节、专业术语）。
+2. 评估该文档与可选类别的匹配度。
+3. 给出最终分类及其置信度。
 
 【输出要求】
-- 仅输出 JSON 格式
-- 示例：{{"type": "行业报告", "confidence": 0.93, "reason": "..."}}
+仅输出 JSON 格式，包含 type, confidence, reason 字段。
+示例：{{"type": "审计报告", "confidence": 0.98, "reason": "文档包含独立审计意见及资产负债表..."}}
 """
         try:
             import json
 
+            # 使用稍微高一点的 temperature 以获取更好的 reason，但保持 low 以保证 type 稳定
             response = self.llm_client.chat([{"role": "user", "content": prompt}], temperature=0.2)
             start = response.find("{")
             end = response.rfind("}") + 1
@@ -105,8 +112,8 @@ class DocumentProcessor:
             logger.error(f"Error processing {pdf_path}: {e}")
             raise OCRError(f"PDF extraction failed for {pdf_path}: {e}")
 
-    def _process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
-        """处理单个 PDF 的内部方法，用于并行化"""
+    def process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
+        """处理单个 PDF，支持缓存和增量更新"""
         file_hash = get_file_hash(pdf_path)
         log = load_json_file(self.config.processing_log_path)
         cached = log.get(pdf_path.name, {})
@@ -154,12 +161,14 @@ class DocumentProcessor:
         if max_workers <= 1:
             for pdf in pdf_files:
                 try:
-                    results.append(self._process_single_pdf(pdf))
+                    results.append(self.process_single_pdf(pdf))
                 except Exception as e:
                     logger.error(f"Failed to process {pdf.name}: {e}")
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                future_to_pdf = {executor.submit(self._process_single_pdf, pdf): pdf for pdf in pdf_files}
+                future_to_pdf = {
+                    executor.submit(self.process_single_pdf, pdf): pdf for pdf in pdf_files
+                }
                 for future in as_completed(future_to_pdf):
                     try:
                         res = future.result()

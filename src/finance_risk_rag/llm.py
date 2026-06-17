@@ -57,7 +57,7 @@ class LLMClientWrapper:
         """
         发送聊天请求，带有指数退避重试机制。
         """
-        if not self.is_available:
+        if not self.is_available or self._client is None:
             raise LLMError("LLM client not initialized.")
 
         retries = 0
@@ -77,7 +77,9 @@ class LLMClientWrapper:
                     raise LLMError(f"LLM call failed after {max_retries} retries: {e}")
 
                 wait_time = initial_backoff * (2 ** (retries - 1))
-                logger.warning(f"LLM call failed: {e}. Retrying in {wait_time:.2f}s... ({retries}/{max_retries})")
+                logger.warning(
+                    f"LLM call failed: {e}. Retrying in {wait_time:.2f}s... ({retries}/{max_retries})"
+                )
                 time.sleep(wait_time)
 
         # Should not reach here

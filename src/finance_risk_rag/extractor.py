@@ -5,8 +5,9 @@ Finance-Risk-RAG 实体提取模块
 
 import logging
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from .config import get_config
 from .exceptions import ExtractionError
@@ -16,12 +17,27 @@ from .utils import calculate_risk_level, clean_text, load_json_file
 logger = logging.getLogger(__name__)
 
 
+class ScoringStrategy(ABC):
+    """实体评分策略接口"""
+
+    @abstractmethod
+    def calculate(self, entity_type: str, confidence: float, base_score: int) -> int:
+        pass
+
+
+class DefaultScoringStrategy(ScoringStrategy):
+    """默认评分策略：基础分数 * 置信度"""
+
+    def calculate(self, entity_type: str, confidence: float, base_score: int) -> int:
+        return int(base_score * confidence)
+
+
 class RuleBasedExtractor:
     """基于规则的实体提取器"""
 
     def __init__(self, config=None, rules_path: Optional[Path] = None):
         self.config = config or get_config()
-        self.rules = {}
+        self.rules: Dict[str, Any] = {}
         if rules_path:
             self.load_rules(rules_path)
         elif self.config.risk_entities_path.exists():
@@ -50,13 +66,14 @@ class RuleBasedExtractor:
                 # Basic implementation: find all occurrences
                 for match in re.finditer(re.escape(keyword), text, re.IGNORECASE):
                     start = match.start()
+                    end = match.end()
                     key = (entity_type, keyword, start)
                     if key in seen:
                         continue
                     seen.add(key)
 
                     context_start = max(0, start - 80)
-                    context_end = min(len(text), start + len(keyword) + 80)
+                    context_end = min(len(text), end + 80)
                     context = text[context_start:context_end].replace("\n", " ").strip()
 
                     entities.append(
@@ -65,6 +82,8 @@ class RuleBasedExtractor:
                             text=keyword,
                             risk_score=base_risk_score,
                             confidence=1.0,
+                            start_char=start,
+                            end_char=end,
                             context=context,
                             source="rule",
                         )
@@ -75,10 +94,12 @@ class RuleBasedExtractor:
 class BERTExtractor:
     """基于 BERT 的实体提取器"""
 
-    def __init__(self, model_path: Optional[Path] = None):
+    def __init__(self, config=None, model_path: Optional[Path] = None):
+        self.config = config or get_config()
         self.model = None
         self.tokenizer = None
-        self.device = None
+        self.device: Union[int, str] = -1
+        model_path = model_path or self.config.bert_local_path
         if model_path and model_path.exists():
             self.load_model(model_path)
 
@@ -110,25 +131,59 @@ class BERTExtractor:
     def is_available(self) -> bool:
         return self.model is not None
 
+    def _chunk_text(
+        self, text: str, max_length: int = 510, overlap: int = 50
+    ) -> List[Tuple[str, int]]:
+        """将文本切分为带偏移量的块，以适应 BERT 限制"""
+        chunks = []
+        start = 0
+        while start < len(text):
+            end = start + max_length
+            chunks.append((text[start:end], start))
+            if end >= len(text):
+                break
+            start += max_length - overlap
+        return chunks
+
     def extract(self, text: str) -> List[Entity]:
         if not self.is_available or not text:
             return []
 
         try:
-            results = self.nlp(text)
-            entities = []
-            for res in results:
-                entities.append(
-                    Entity(
-                        type=res["entity_group"],
-                        text=res["word"],
-                        risk_score=20,  # Default risk score for BERT entities
-                        confidence=float(res["score"]),
-                        context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
-                        source="bert",
+            chunks = self._chunk_text(text)
+            all_entities = []
+            seen_keys = set()
+
+            for chunk_text, offset in chunks:
+                results = self.nlp(chunk_text)
+                for res in results:
+                    start_char = res["start"] + offset
+                    end_char = res["end"] + offset
+                    word = res["word"]
+                    entity_type = res["entity_group"]
+
+                    # 避免在块边界重复
+                    key = (entity_type, start_char, end_char)
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+
+                    base_score = self.config.bert_risk_scores.get(entity_type, 20)
+                    confidence = float(res["score"])
+
+                    all_entities.append(
+                        Entity(
+                            type=entity_type,
+                            text=word,
+                            risk_score=int(base_score * confidence),
+                            confidence=confidence,
+                            start_char=start_char,
+                            end_char=end_char,
+                            context=text[max(0, start_char - 40) : min(len(text), end_char + 40)],
+                            source="bert",
+                        )
                     )
-                )
-            return entities
+            return all_entities
         except Exception as e:
             logger.error(f"BERT extraction failed: {e}")
             return []
@@ -137,10 +192,17 @@ class BERTExtractor:
 class EntityExtractionPipeline:
     """实体提取管道"""
 
-    def __init__(self, config=None, rule_extractor=None, bert_extractor=None):
+    def __init__(
+        self,
+        config=None,
+        rule_extractor=None,
+        bert_extractor=None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
         self.config = config or get_config()
         self.rule_extractor = rule_extractor or RuleBasedExtractor(config=self.config)
-        self.bert_extractor = bert_extractor or BERTExtractor(self.config.bert_local_path)
+        self.bert_extractor = bert_extractor or BERTExtractor(config=self.config)
+        self.scoring_strategy = scoring_strategy or DefaultScoringStrategy()
 
     def process(self, text_or_path: Union[str, Path]) -> ExtractionResult:
         if isinstance(text_or_path, Path):
@@ -163,31 +225,42 @@ class EntityExtractionPipeline:
             entities=entities_list, total_risk_score=total_risk, risk_level=risk_level
         )
 
-    def _merge_and_arbitrate(self, rule_entities: List[Entity], bert_entities: List[Entity]) -> List[Entity]:
+    def _merge_and_arbitrate(
+        self, rule_entities: List[Entity], bert_entities: List[Entity]
+    ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理重叠。
-        优先考虑高分和高置信度的实体。
+        基于字符偏移和评分进行仲裁。
         """
         all_entities = rule_entities + bert_entities
         if not all_entities:
             return []
 
-        # 按得分和置信度排序
-        all_entities.sort(key=lambda x: (x.risk_score, x.confidence), reverse=True)
+        # 按得分、置信度和长度排序
+        all_entities.sort(key=lambda x: (x.risk_score, x.confidence, len(x.text)), reverse=True)
 
         final_entities: List[Entity] = []
 
         for current in all_entities:
             is_redundant = False
             for existing in final_entities:
-                # 简单的重叠检测：如果文本完全包含或被包含，且类型相似
-                if (current.text in existing.text or existing.text in current.text) and (
-                    current.type == existing.type or current.risk_score == existing.risk_score
-                ):
-                    is_redundant = True
-                    break
+                # 检查字符位置重叠
+                overlap = max(
+                    0,
+                    min(current.end_char, existing.end_char)
+                    - max(current.start_char, existing.start_char),
+                )
+                if overlap > 0:
+                    # 如果有重叠，且现有实体的得分更高，则当前实体是多余的
+                    if existing.risk_score >= current.risk_score:
+                        is_redundant = True
+                        break
+                    # 如果当前实体得分更高，理论上应该移除 existing，
+                    # 但由于我们已经按得分排序，这种情况在正确排序时不会发生（或 existing 已是最佳）
 
             if not is_redundant:
                 final_entities.append(current)
 
+        # 最后按位置排序，方便阅读
+        final_entities.sort(key=lambda x: x.start_char)
         return final_entities

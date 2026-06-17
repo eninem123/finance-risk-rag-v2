@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from src.finance_risk_rag.llm import LLMClientWrapper, LLMError
+
 
 def test_llm_retry_logic():
     mock_client = MagicMock()
@@ -8,7 +11,7 @@ def test_llm_retry_logic():
     mock_client.chat.completions.create.side_effect = [
         Exception("API Error"),
         Exception("Rate Limit"),
-        MagicMock(choices=[MagicMock(message=MagicMock(content="Success"))])
+        MagicMock(choices=[MagicMock(message=MagicMock(content="Success"))]),
     ]
 
     with patch("openai.OpenAI", return_value=mock_client):
@@ -17,6 +20,7 @@ def test_llm_retry_logic():
         result = wrapper.chat([{"role": "user", "content": "hi"}], initial_backoff=0.01)
         assert result == "Success"
         assert mock_client.chat.completions.create.call_count == 3
+
 
 def test_llm_failure_after_retries():
     mock_client = MagicMock()
