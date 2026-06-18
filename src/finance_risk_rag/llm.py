@@ -1,97 +1,77 @@
-"""
-Finance-Risk-RAG LLM 客户端模块
-==============================
-"""
-
 import logging
 import time
 from typing import Dict, List, Optional
 
-from .config import get_config
+from openai import OpenAI
+
 from .exceptions import LLMError
 
 logger = logging.getLogger(__name__)
 
 
 class LLMClientWrapper:
-    """LLM 客户端封装类"""
+    """封装 LLM 客户端，支持重试和统一接口"""
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        model_name: Optional[str] = None,
+        base_url: str = "https://api.openai.com/v1",
+        model_name: str = "gpt-3.5-turbo",
     ):
-        config = get_config()
-        self.api_key = api_key or config.llm_api_key
-        self.base_url = base_url or config.llm_base_url
-        self.model_name = model_name or config.llm_model_name
-        self._client = None
-
-        if not self.api_key:
-            logger.warning("LLM API key not found.")
-            return
-
-        self._initialize_client()
-
-    def _initialize_client(self):
-        try:
-            from openai import OpenAI
-
-            self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-        except Exception as e:
-            raise LLMError(f"Failed to initialize OpenAI client: {e}")
+        self.api_key = api_key
+        self.base_url = base_url
+        self.model_name = model_name
+        self.client = None
+        if api_key:
+            self.client = OpenAI(api_key=api_key, base_url=base_url)
 
     @property
     def is_available(self) -> bool:
-        return self._client is not None
+        return self.client is not None
 
     def chat(
         self,
         messages: List[Dict[str, str]],
-        temperature: float = 0.0,
-        max_tokens: int = 1000,
+        temperature: float = 0.7,
         max_retries: int = 3,
         initial_backoff: float = 1.0,
     ) -> str:
-        """
-        发送聊天请求，带有指数退避重试机制。
-        """
         if not self.is_available:
-            raise LLMError("LLM client not initialized.")
+            raise LLMError("LLM client not initialized (missing API key)")
 
-        retries = 0
-        while retries <= max_retries:
+        for attempt in range(max_retries):
             try:
-                response = self._client.chat.completions.create(
+                response = self.client.chat.completions.create(
                     model=self.model_name,
-                    messages=messages,
+                    messages=messages,  # type: ignore
                     temperature=temperature,
-                    max_tokens=max_tokens,
                 )
-                return response.choices[0].message.content
+                return response.choices[0].message.content or ""
             except Exception as e:
-                retries += 1
-                if retries > max_retries:
-                    logger.error(f"LLM call failed after {max_retries} retries: {e}")
+                if attempt == max_retries - 1:
+                    logger.error(f"LLM chat failed after {max_retries} attempts: {e}")
                     raise LLMError(f"LLM call failed after {max_retries} retries: {e}")
+                time.sleep(initial_backoff * (2**attempt))
+        return ""
 
-                wait_time = initial_backoff * (2 ** (retries - 1))
-                logger.warning(f"LLM call failed: {e}. Retrying in {wait_time:.2f}s... ({retries}/{max_retries})")
-                time.sleep(wait_time)
+    def ask(self, question: str, context: str) -> str:
+        """针对 RAG 优化的提问接口"""
+        prompt = f"""
+你是一个专业的金融风险控制专家。请根据以下提供的参考文本回答用户的问题。
+如果参考文本中没有相关信息，请诚实告知。
 
-        # Should not reach here
-        raise LLMError("Unexpected exit from retry loop.")
+【参考文本】
+{context}
 
-    def ask(self, query: str, context: str) -> str:
-        messages = [
-            {
-                "role": "system",
-                "content": "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。",
-            },
-            {
-                "role": "user",
-                "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}",
-            },
-        ]
-        return self.chat(messages)
+【用户问题】
+{question}
+
+请以专业、客观的角度进行回答，并指出风险点（如有）。
+"""
+        messages = [{"role": "user", "content": prompt}]
+        # Use implicit string concatenation to avoid E501
+        logger.info(
+            f"Sending RAG query to LLM (model: {self.model_name}, "
+            f"context length: {len(context)})"
+        )
+        return self.chat(messages, temperature=0.3)
