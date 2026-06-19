@@ -105,8 +105,8 @@ class DocumentProcessor:
             logger.error(f"Error processing {pdf_path}: {e}")
             raise OCRError(f"PDF extraction failed for {pdf_path}: {e}")
 
-    def _process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
-        """处理单个 PDF 的内部方法，用于并行化"""
+    def process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
+        """处理单个 PDF 的方法，支持并行化"""
         file_hash = get_file_hash(pdf_path)
         log = load_json_file(self.config.processing_log_path)
         cached = log.get(pdf_path.name, {})
@@ -154,12 +154,14 @@ class DocumentProcessor:
         if max_workers <= 1:
             for pdf in pdf_files:
                 try:
-                    results.append(self._process_single_pdf(pdf))
+                    results.append(self.process_single_pdf(pdf))
                 except Exception as e:
                     logger.error(f"Failed to process {pdf.name}: {e}")
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                future_to_pdf = {executor.submit(self._process_single_pdf, pdf): pdf for pdf in pdf_files}
+                future_to_pdf = {
+                    executor.submit(self.process_single_pdf, pdf): pdf for pdf in pdf_files
+                }
                 for future in as_completed(future_to_pdf):
                     try:
                         res = future.result()

@@ -20,6 +20,8 @@ class Entity:
     confidence: float
     context: str = ""
     source: str = "rule"
+    start_char: int = 0
+    end_char: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -31,13 +33,15 @@ class Entity:
             "confidence": round(self.confidence, 4),
             "context": self.context,
             "source": self.source,
+            "start_char": self.start_char,
+            "end_char": self.end_char,
             **self.metadata,
         }
 
     @property
-    def key(self) -> Tuple[str, str]:
+    def key(self) -> Tuple[str, str, int]:
         """实体唯一键（用于去重）"""
-        return (self.text, self.type)
+        return (self.type, self.text, self.start_char)
 
 
 @dataclass

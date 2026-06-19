@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏦 Finance-Risk-RAG v2.1
+# 🏦 Finance-Risk-RAG v2.2
 
 **银行级多语言财务文本风控 AI 系统**
 
@@ -49,6 +49,8 @@ Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，专为金�
 - 风险等级自动评估与建议生成
 
 ### 🏗️ 企业级架构
+- **Service 编排层**：统一调度 OCR、NLP 与 RAG 模块
+- **交互式 Dashboard**：基于 Streamlit 的可视化风险分析面板
 - 模块化设计，易于集成与扩展
 - 统一配置管理，灵活适配不同场景
 - 完整的异常处理与日志体系
@@ -76,11 +78,14 @@ Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，专为金�
 │                    处理层 (Processing Layer)                 │
 │  OCR 识别  →  文本清洗  →  文档分类  →  结构解析            │
 ├─────────────────────────────────────────────────────────────┤
+│                    编排层 (Service Layer)                    │
+│        RiskAnalysisService 全流程调度与业务逻辑编排         │
+├─────────────────────────────────────────────────────────────┤
 │                     分析层 (Analysis Layer)                  │
 │  实体提取 (BERT)  →  规则匹配  →  风险评级  →  关系图谱      │
 ├─────────────────────────────────────────────────────────────┤
 │                     应用层 (Application Layer)               │
-│  RAG 问答  │  风险报告  │  预警推送  │  可视化展示          │
+│  RAG 问答  │  可视化 Dashboard  │  风险报告  │  预警推送     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -113,16 +118,14 @@ python main.py --help
 ### 快速上手
 
 ```bash
-# 处理单个 PDF 文档
-python main.py process --input document.pdf
+# 全流程处理（OCR + 实体提取 + RAG 索引）
+python main.py process --input ./docs/
 
-# 批量处理目录
-python main.py process --input ./docs/ --output ./results/
+# 启动可视化 Dashboard
+python main.py dashboard
+# 或者直接运行: streamlit run dashboard.py
 
-# 启动 RAG 问答模式
-python main.py rag --knowledge-base ./knowledge_base/
-
-# 交互式查询
+# 命令行交互式查询
 python main.py query "这笔贷款有哪些风险点？"
 ```
 

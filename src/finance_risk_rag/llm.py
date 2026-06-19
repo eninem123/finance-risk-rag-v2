@@ -77,7 +77,10 @@ class LLMClientWrapper:
                     raise LLMError(f"LLM call failed after {max_retries} retries: {e}")
 
                 wait_time = initial_backoff * (2 ** (retries - 1))
-                logger.warning(f"LLM call failed: {e}. Retrying in {wait_time:.2f}s... ({retries}/{max_retries})")
+                logger.warning(
+                    f"LLM call failed: {e}. Retrying in {wait_time:.2f}s... "
+                    f"({retries}/{max_retries})"
+                )
                 time.sleep(wait_time)
 
         # Should not reach here

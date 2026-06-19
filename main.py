@@ -4,25 +4,29 @@ Finance-Risk-RAG 统一命令行入口
 """
 
 import argparse
+import sys
 from pathlib import Path
 
-from src.finance_risk_rag.config import get_config
-from src.finance_risk_rag.engine import RAGEngine
-from src.finance_risk_rag.extractor import EntityExtractionPipeline
-from src.finance_risk_rag.processor import DocumentProcessor
-from src.finance_risk_rag.utils import setup_logger
+# Standardize sys.path
+src_path = Path(__file__).parent / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+from src.finance_risk_rag.config import get_config  # noqa: E402
+from src.finance_risk_rag.service import RiskAnalysisService  # noqa: E402
+from src.finance_risk_rag.utils import save_json_file, setup_logger  # noqa: E402
 
 
 def main():
     parser = argparse.ArgumentParser(description="Finance-Risk-RAG: 银行级财务文本风控 AI 系统")
     subparsers = parser.add_subparsers(dest="command", help="子命令")
 
-    # Process 子命令
-    process_parser = subparsers.add_parser("process", help="处理 PDF 文档 (OCR + 分类)")
-    process_parser.add_argument("--dir", type=str, help="文档目录")
+    # Process 子命令 (全流程分析)
+    process_parser = subparsers.add_parser("process", help="全流程处理 PDF (OCR + 提取 + 索引)")
+    process_parser.add_argument("--input", type=str, help="文档或目录路径")
 
-    # Extract 子命令
-    extract_parser = subparsers.add_parser("extract", help="提取风险实体")
+    # Extract 子命令 (仅提取)
+    extract_parser = subparsers.add_parser("extract", help="从文本提取风险实体")
     extract_parser.add_argument(
         "--input", type=str, default="docs/all_extracted.txt", help="输入文本文件"
     )
@@ -35,34 +39,49 @@ def main():
     query_parser.add_argument("question", type=str, help="用户问题")
     query_parser.add_argument("--build", action="store_true", help="先构建索引")
 
+    # Dashboard 子命令
+    subparsers.add_parser("dashboard", help="启动 Streamlit 可视化面板")
+
     args = parser.parse_args()
     config = get_config()
     setup_logger("finance_risk_rag")
 
+    # Initialize Service
+    service = RiskAnalysisService(config)
+
     if args.command == "process":
-        processor = DocumentProcessor(config)
-        docs_dir = Path(args.dir) if args.dir else config.docs_dir
-        processor.process_directory(docs_dir)
-        print("文档处理完成。")
+        input_path = Path(args.input) if args.input else config.docs_dir
+        if not input_path.exists():
+            print(f"错误: 路径不存在 - {input_path}")
+            return
+
+        print(f"正在分析: {input_path}")
+        results = service.run_full_analysis(input_path)
+        print(f"分析完成。处理了 {len(results)} 个文件。")
 
     elif args.command == "extract":
-        pipeline = EntityExtractionPipeline(config)
-        result = pipeline.process(Path(args.input))
-        # Save result
-        from src.finance_risk_rag.utils import save_json_file
+        input_path = Path(args.input)
+        if not input_path.exists():
+            print(f"错误: 文件不存在 - {input_path}")
+            return
 
+        result = service.pipeline.process(input_path)
         save_json_file(result.to_dict(), Path(args.output))
         print(f"实体提取完成。风险等级: {result.risk_level}, 总分: {result.total_risk_score}")
 
     elif args.command == "query":
-        engine = RAGEngine(config)
         if args.build:
             print("正在构建索引...")
-            engine.build_index()
+            service.engine.build_index()
 
-        result = engine.query(args.question)
+        result = service.query_risk(args.question)
         print(f"\n回答: {result.answer}")
         print(f"\n来源: {result.sources}")
+
+    elif args.command == "dashboard":
+        import os
+
+        os.system("streamlit run dashboard.py")
 
     else:
         parser.print_help()

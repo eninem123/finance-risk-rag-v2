@@ -50,13 +50,14 @@ class RuleBasedExtractor:
                 # Basic implementation: find all occurrences
                 for match in re.finditer(re.escape(keyword), text, re.IGNORECASE):
                     start = match.start()
+                    end = match.end()
                     key = (entity_type, keyword, start)
                     if key in seen:
                         continue
                     seen.add(key)
 
                     context_start = max(0, start - 80)
-                    context_end = min(len(text), start + len(keyword) + 80)
+                    context_end = min(len(text), end + 80)
                     context = text[context_start:context_end].replace("\n", " ").strip()
 
                     entities.append(
@@ -67,6 +68,8 @@ class RuleBasedExtractor:
                             confidence=1.0,
                             context=context,
                             source="rule",
+                            start_char=start,
+                            end_char=end,
                         )
                     )
         return entities
@@ -85,11 +88,7 @@ class BERTExtractor:
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import (
-                AutoModelForTokenClassification,
-                AutoTokenizer,
-                pipeline,
-            )
+            from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
@@ -106,12 +105,11 @@ class BERTExtractor:
             logger.warning(f"Failed to load BERT model: {e}")
             self.model = None
 
-    @property
     def is_available(self) -> bool:
         return self.model is not None
 
     def extract(self, text: str) -> List[Entity]:
-        if not self.is_available or not text:
+        if not self.is_available() or not text:
             return []
 
         try:
@@ -126,6 +124,8 @@ class BERTExtractor:
                         confidence=float(res["score"]),
                         context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
                         source="bert",
+                        start_char=res["start"],
+                        end_char=res["end"],
                     )
                 )
             return entities
@@ -163,7 +163,9 @@ class EntityExtractionPipeline:
             entities=entities_list, total_risk_score=total_risk, risk_level=risk_level
         )
 
-    def _merge_and_arbitrate(self, rule_entities: List[Entity], bert_entities: List[Entity]) -> List[Entity]:
+    def _merge_and_arbitrate(
+        self, rule_entities: List[Entity], bert_entities: List[Entity]
+    ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理重叠。
         优先考虑高分和高置信度的实体。
@@ -180,10 +182,11 @@ class EntityExtractionPipeline:
         for current in all_entities:
             is_redundant = False
             for existing in final_entities:
-                # 简单的重叠检测：如果文本完全包含或被包含，且类型相似
-                if (current.text in existing.text or existing.text in current.text) and (
-                    current.type == existing.type or current.risk_score == existing.risk_score
-                ):
+                # 使用字符偏移量进行精确的重叠检测
+                overlap = max(current.start_char, existing.start_char) < min(
+                    current.end_char, existing.end_char
+                )
+                if overlap:
                     is_redundant = True
                     break
 
