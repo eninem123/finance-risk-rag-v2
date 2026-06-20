@@ -87,7 +87,8 @@ finance-risk-rag-v2/
 | #15 | `feature/v2.2-optimization-7723*` | v2.2 架构升级 |
 | #16 | `feature/optimize-architecture-v2.2-*` | 架构优化 + Dashboard |
 | #17 | `feature/v2.2-optimization-1572*` | v2.2 全面升级 |
-| #18 | `feature/professional-refactoring-and-dashboard-v2.2-*` | **保留为唯一迭代入口** |
+| #18 | `feature/professional-refactoring-and-dashboard-v2.2-*` | 已合并至 main（2026-06-20） |
+| #19 | `feature/professional-refactoring-and-dashboard-v2.2-*` | **当前唯一迭代入口（Draft PR）** |
 
 ### 删除分支（8 个 feature 临时分支）
 
