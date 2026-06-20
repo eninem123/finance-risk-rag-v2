@@ -15,13 +15,22 @@ class TestRiskAnalysisService(unittest.TestCase):
         self.mock_config = MagicMock()
         self.mock_processor = MagicMock()
         self.mock_extractor = MagicMock()
+        self.mock_engine = MagicMock()
         self.service = RiskAnalysisService(
-            config=self.mock_config, processor=self.mock_processor, extractor=self.mock_extractor
+            config=self.mock_config,
+            processor=self.mock_processor,
+            extractor=self.mock_extractor,
+            engine=self.mock_engine,
         )
 
     def test_run_full_analysis(self):
         # 准备 Mock 返回值
-        mock_pdf = Path("test.pdf")
+        mock_pdf = MagicMock(spec=Path)
+        mock_pdf.is_file.return_value = True
+        mock_pdf.suffix = ".pdf"
+        mock_pdf.name = "test.pdf"
+        mock_pdf.__str__.return_value = "test.pdf"
+
         self.mock_processor.process_single_pdf.return_value = {
             "text": "sample text",
             "classification": {"type": "审计报告", "confidence": 0.9, "reason": "test"},
@@ -37,9 +46,11 @@ class TestRiskAnalysisService(unittest.TestCase):
         result = self.service.run_full_analysis(mock_pdf)
 
         # 断言
-        self.assertEqual(result["document_info"]["name"], "test.pdf")
-        self.assertEqual(result["classification"]["type"], "审计报告")
-        self.assertEqual(result["risk_analysis"]["total_risk_score"], 30)
+        self.assertEqual(result["status"], "success")
+        analysis_data = result["results"][0]
+        self.assertEqual(analysis_data["document_info"]["name"], "test.pdf")
+        self.assertEqual(analysis_data["classification"]["type"], "审计报告")
+        self.assertEqual(analysis_data["risk_analysis"]["total_risk_score"], 30)
         self.mock_processor.process_single_pdf.assert_called_once_with(mock_pdf)
         self.mock_extractor.process.assert_called_once()
 

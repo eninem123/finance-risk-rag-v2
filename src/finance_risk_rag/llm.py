@@ -39,7 +39,11 @@ class LLMClientWrapper:
             from openai import OpenAI
 
             self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        except ImportError:
+            logger.error("OpenAI package not found. Please install it with 'pip install openai'.")
+            self._client = None
         except Exception as e:
+            logger.error(f"Failed to initialize OpenAI client: {e}")
             raise LLMError(f"Failed to initialize OpenAI client: {e}")
 
     @property
@@ -71,6 +75,7 @@ class LLMClientWrapper:
                 )
                 return response.choices[0].message.content
             except Exception as e:
+                logger.warning(f"LLM API call error: {e}")
                 retries += 1
                 if retries > max_retries:
                     logger.error(f"LLM call failed after {max_retries} retries: {e}")

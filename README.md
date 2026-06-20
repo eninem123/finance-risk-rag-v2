@@ -2,117 +2,95 @@
 
 <div align="center">
 
-**银行级多语言财务文本风控 AI 系统**
+**Enterprise-Grade Multi-language Financial Risk Control AI System**
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-v2.2-blue?style=flat-square)]()
 
-OCR 智能识别 · BERT 实体提取 · RAG 风险问答 · Streamlit 可视化面板
+Advanced OCR · Hybrid Entity Extraction · RAG-based Risk Q&A · Streamlit Analytics
 
 </div>
 
 ---
 
-## 项目简介
+## 🏛 System Architecture
 
-Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，整合 OCR、BERT 实体提取、规则引擎与 RAG 检索增强生成，支持批量 PDF 处理、风险实体识别与智能问答。
+Finance-Risk-RAG is a professional AI framework designed for financial institutions to automate the risk assessment of complex documents. It integrates multiple cutting-edge technologies into a unified pipeline:
 
-> 本仓库为**个人闲置测试项目**，代码已收敛至 `main` 主线 v2.2 稳定版。
-
----
-
-## v2.2 核心能力
-
-| 模块 | 说明 |
-|------|------|
-| `RiskAnalysisService` | 业务编排层，协调 OCR → 分类 → 提取 → RAG |
-| `dashboard.py` | Streamlit 交互式面板（数据总览 / 文档分析 / 风险检索） |
-| `main.py report` | 生成 Markdown + JSON 综合风险报告 |
-| BERT 长文本切片 | 滑动窗口 Overlap Chunking，支持长文档 |
-| 精准偏移定位 | Entity 模型含 `start_char` / `end_char` |
+1.  **Intelligent Document Processor**: Utilizing Tesseract OCR and `pdfplumber` to extract text from both digital and scanned PDFs, with advanced image preprocessing for high-accuracy financial table recognition.
+2.  **Hybrid Extraction Engine**: Combines high-precision Rule-Based extractors (for known financial risk keywords) with BERT-based deep learning models (for context-aware entity discovery).
+3.  **Enterprise Service Layer**: Orchestrates the entire workflow, providing a robust API for document classification, entity merging, and automated report generation.
+4.  **RAG Analysis Engine**: Powered by ChromaDB and LLMs (OpenAI/Moonshot), enabling conversational risk analysis over indexed document repositories.
 
 ---
 
-## 快速开始
+## 🚀 Key Capabilities
+
+-   **High-Fidelity Extraction**: Precise character-offset tracking (`start_char`/`end_char`) for all identified risks.
+-   **Intelligent Classification**: Automatic document categorization (e.g., Audit Reports, Industry Analysis) using LLM-driven zero-shot classification.
+-   **Automated Risk Reporting**: Generates comprehensive Markdown and JSON reports with quantitative risk scores and prioritized action items.
+-   **Parallel Batch Processing**: Optimized for enterprise workloads using `ProcessPoolExecutor` for high-throughput document processing.
+-   **Interactive Dashboard**: A professional Streamlit interface for visualization, deep-dive analysis, and RAG-based search.
+
+---
+
+## 🛠 Quick Start
+
+### Installation
 
 ```bash
 git clone https://github.com/eninem123/finance-risk-rag-v2.git
 cd finance-risk-rag-v2
 pip install -r requirements.txt
+```
 
-# 全流程处理
+### Usage
+
+```bash
+# 1. Full Pipeline Processing (OCR -> Extraction -> Indexing)
 python main.py process --input ./docs/
 
-# RAG 问答
-python main.py query "这笔贷款有哪些风险点？"
+# 2. Risk Q&A (RAG)
+python main.py query "What are the major risk factors identified in the latest audit?"
 
-# 生成风险报告
-python main.py report --input document.pdf --output-dir reports/
+# 3. Comprehensive Risk Report Generation
+python main.py report --input sample_audit.pdf --output-dir reports/
 
-# 启动可视化面板
+# 4. Launch Interactive Analytics Dashboard
 python main.py dashboard
 ```
 
 ---
 
-## 项目结构
+## 📂 Project Structure
 
-```
+```text
 finance-risk-rag-v2/
 ├── src/finance_risk_rag/
-│   ├── service.py          # 业务编排服务层 (v2.2)
-│   ├── extractor.py        # 实体提取管道
-│   ├── processor.py        # 文档 OCR 处理
-│   ├── engine.py           # RAG 引擎
-│   └── ...
-├── dashboard.py            # Streamlit 可视化面板
-├── main.py                 # 统一 CLI 入口
-├── tests/                  # 单元测试
-└── .github/workflows/      # CI（仅 PR → main 触发）
+│   ├── service.py          # Enterprise Orchestration Layer
+│   ├── extractor.py        # Hybrid Extraction Engine (Rule + BERT)
+│   ├── processor.py        # Intelligent OCR & Document Processing
+│   ├── engine.py           # RAG Retrieval & Knowledge Engine
+│   ├── llm.py              # LLM Client Wrapper with Retry Logic
+│   └── models.py           # Unified Data Models (Entity, ExtractionResult)
+├── dashboard.py            # Streamlit Interactive Dashboard
+├── main.py                 # Unified Command-Line Interface (CLI)
+├── tests/                  # Professional Test Suite
+└── knowledge_base/         # Financial Dictionaries & Rule Sets
 ```
 
 ---
 
-## 2026-06 仓库整理记录
+## 🛡 Security & Compliance
 
-### 合并 PR（#11–#17 → main）
-
-| PR | 分支 | 内容 |
-|----|------|------|
-| #11 | `feature/professional-v2.1-optimization-*` | v2.1 架构优化 |
-| #12 | `feature/enterprise-optimization-*` | 企业服务层 + 报告生成 |
-| #13 | `optimize-finance-risk-rag-v2.2-*` | v2.2 服务层重构 |
-| #14 | `feature/professional-refactoring-and-dashboard-*` | 服务层 + 仪表盘 |
-| #15 | `feature/v2.2-optimization-7723*` | v2.2 架构升级 |
-| #16 | `feature/optimize-architecture-v2.2-*` | 架构优化 + Dashboard |
-| #17 | `feature/v2.2-optimization-1572*` | v2.2 全面升级 |
-| #18 | `feature/professional-refactoring-and-dashboard-v2.2-*` | 已合并至 main（2026-06-20） |
-| #19 | `feature/professional-refactoring-and-dashboard-v2.2-*` | **当前唯一迭代入口（Draft PR）** |
-
-### 删除分支（8 个 feature 临时分支）
-
-- `feature/enterprise-optimization-5050392069136229718`
-- `feature/optimize-architecture-v2.2-18168074359074526671`
-- `feature/professional-refactoring-and-dashboard-4562812990206762378`
-- `feature/professional-refactoring-and-dashboard-v2.2-2030757817022327085`
-- `feature/professional-v2.1-optimization-5571732041245732993`
-- `feature/v2.2-optimization-15723274487901237107`
-- `feature/v2.2-optimization-7723375731582770803`
-- `optimize-finance-risk-rag-v2.2-647354061673373050`
-
-### CI 降噪变更
-
-- 移除 `push` 自动触发，**仅 `pull_request → main`** 时运行
-- 取消 Python 多版本矩阵与 lint / test 重复步骤
-- 简化为单版本基础编译校验（`py_compile` + `compileall`）
-
-### Bot 降噪变更
-
-- 新增 `.cursor/rules/bot-noise-reduction.mdc`：禁止自动 PR 评论与 CI 告警回复，仅响应手动 @
+The system is built with financial compliance in mind:
+-   **Auditable Logs**: Every extraction and LLM call is logged for transparency.
+-   **Local Processing**: Supports local BERT models and local vector stores to ensure data privacy.
+-   **Customizable Rules**: Easily update the risk dictionary in `knowledge_base/` to match local regulatory requirements.
 
 ---
 
-## 许可证
+## ⚖️ License
 
-MIT License — 详见 [LICENSE](LICENSE)
+Distributed under the MIT License. See `LICENSE` for more information.

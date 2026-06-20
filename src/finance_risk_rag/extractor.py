@@ -172,18 +172,44 @@ class EntityExtractionPipeline:
     ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理重叠。
-        优先考虑高分和高置信度的实体。
+        策略：
+        1. 优先考虑高置信度的 BERT 实体 (confidence > 0.8)
+        2. 其次考虑高风险分数的规则实体
+        3. 处理重叠：高优实体覆盖低优实体
         """
-        all_entities = rule_entities + bert_entities
+        # 给不同来源的实体加权，BERT 高置信度实体赋予额外权重
+        all_entities = []
+        for e in rule_entities:
+            all_entities.append(e)
+        for e in bert_entities:
+            # 如果 BERT 置信度很高，提升其排序权重
+            weight = 100 if e.confidence > 0.8 else 0
+            # 暂时通过一个临时元组来辅助排序，不修改原始对象
+            all_entities.append((e, weight))
+
         if not all_entities:
             return []
 
-        # 按得分和置信度排序
-        all_entities.sort(key=lambda x: (x.risk_score, x.confidence), reverse=True)
+        # 统一处理排序：(权重, 风险分数, 置信度)
+        def sort_key(item):
+            if isinstance(item, tuple):
+                e, w = item
+                return (w, e.risk_score, e.confidence)
+            return (0, item.risk_score, item.confidence)
+
+        all_entities.sort(key=sort_key, reverse=True)
+
+        # 还原回 Entity 列表
+        sorted_entities = []
+        for item in all_entities:
+            if isinstance(item, tuple):
+                sorted_entities.append(item[0])
+            else:
+                sorted_entities.append(item)
 
         final_entities: List[Entity] = []
 
-        for current in all_entities:
+        for current in sorted_entities:
             is_redundant = False
             for existing in final_entities:
                 # 使用字符偏移量进行精确的重叠检测
