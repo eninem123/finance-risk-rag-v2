@@ -1,26 +1,22 @@
-"""
-Finance-Risk-RAG LLM 客户端模块
-==============================
-"""
-
 import logging
 import time
 from typing import Dict, List, Optional
 
-from .config import get_config
+from openai import OpenAI
+
 from .exceptions import LLMError
 
 logger = logging.getLogger(__name__)
 
 
 class LLMClientWrapper:
-    """LLM 客户端封装类"""
+    """封装 LLM 客户端，支持重试和统一接口"""
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        model_name: Optional[str] = None,
+        base_url: str = "https://api.openai.com/v1",
+        model_name: str = "gpt-3.5-turbo",
     ):
         config = get_config()
         self.api_key = api_key or config.llm_api_key
@@ -47,7 +43,7 @@ class LLMClientWrapper:
 
     @property
     def is_available(self) -> bool:
-        return self._client is not None
+        return self.client is not None
 
     def chat(
         self,
@@ -57,22 +53,17 @@ class LLMClientWrapper:
         max_retries: int = 3,
         initial_backoff: float = 1.0,
     ) -> str:
-        """
-        发送聊天请求，带有指数退避重试机制。
-        """
         if not self.is_available:
             raise LLMError("LLM client not initialized or API key missing.")
 
-        retries = 0
-        while retries <= max_retries:
+        for attempt in range(max_retries):
             try:
-                response = self._client.chat.completions.create(
+                response = self.client.chat.completions.create(
                     model=self.model_name,
-                    messages=messages,
+                    messages=messages,  # type: ignore
                     temperature=temperature,
-                    max_tokens=max_tokens,
                 )
-                return response.choices[0].message.content
+                return response.choices[0].message.content or ""
             except Exception as e:
                 error_msg = str(e)
                 # 检查是否为配额或频率限制错误
@@ -83,6 +74,8 @@ class LLMClientWrapper:
                 if retries > max_retries:
                     logger.error(f"LLM call failed after {max_retries} retries: {e}")
                     raise LLMError(f"LLM call failed after {max_retries} retries: {e}")
+                time.sleep(initial_backoff * (2**attempt))
+        return ""
 
                 wait_time = initial_backoff * (2 ** (retries - 1))
                 logger.warning(

@@ -1,10 +1,11 @@
+import json
+
 from src.finance_risk_rag.extractor import RuleBasedExtractor
 
 
 def test_rule_based_extractor(tmp_path):
     # Create dummy rules
     rules_file = tmp_path / "rules.json"
-    import json
 
     rules = {"liquidity_risk": {"keywords": ["现金流", "流动性"], "risk_score": 20}}
     rules_file.write_text(json.dumps(rules), encoding="utf-8")
@@ -17,3 +18,7 @@ def test_rule_based_extractor(tmp_path):
     assert entities[0].type == "liquidity_risk"
     assert any(e.text == "现金流" for e in entities)
     assert any(e.text == "流动性" for e in entities)
+
+    # Check offsets
+    for e in entities:
+        assert text[e.start_char : e.end_char] == e.text

@@ -183,6 +183,8 @@ class BERTExtractor:
                         text=res["word"],
                         risk_score=20,  # Default risk score for BERT entities
                         confidence=float(res["score"]),
+                        start_char=res["start"],
+                        end_char=res["end"],
                         context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
                         source="bert",
                         start_char=res["start"],
