@@ -93,13 +93,17 @@ class DocumentProcessor:
                     if page_text and len(page_text.strip()) > 50:
                         text += f"\n--- Page {i+1} (Text) ---\n{page_text}"
                     else:
-                        img = page.to_image(resolution=self.config.ocr_dpi).original
-                        img = self.optimize_image_for_ocr(img)
-                        ocr_text = pytesseract.image_to_string(
-                            img, lang=self.config.ocr_languages, config="--oem 1 --psm 3"
-                        )
-                        text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
-                        ocr_pages += 1
+                        try:
+                            img = page.to_image(resolution=self.config.ocr_dpi).original
+                            img = self.optimize_image_for_ocr(img)
+                            ocr_text = pytesseract.image_to_string(
+                                img, lang=self.config.ocr_languages, config="--oem 1 --psm 3"
+                            )
+                            text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
+                            ocr_pages += 1
+                        except Exception as e:
+                            logger.error(f"OCR failed for page {i+1} of {pdf_path}: {e}")
+                            text += f"\n--- Page {i+1} (OCR Failed) ---\n"
             return text, ocr_pages
         except Exception as e:
             logger.error(f"Error processing {pdf_path}: {e}")

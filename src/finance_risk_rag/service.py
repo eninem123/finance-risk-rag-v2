@@ -59,12 +59,10 @@ class RiskAnalysisService:
             "risk_analysis": extraction_result.to_dict(),
         }
 
-    def run_full_analysis(
-        self, input_path: Path
-    ) -> Union[Dict[str, ExtractionResult], Dict[str, Any]]:
+    def run_full_analysis(self, input_path: Path) -> Dict[str, Any]:
         """
         执行全流程分析：OCR -> 文档分类 -> 实体提取 -> RAG 索引构建。
-        单 PDF 返回详细分析字典，目录返回文件名到提取结果的映射。
+        无论输入是单个文件还是目录，都返回统一的字典格式。
         """
         if input_path.is_file() and input_path.suffix.lower() == ".pdf":
             analysis_data = self.analyze_document(input_path)
@@ -73,22 +71,24 @@ class RiskAnalysisService:
             if txt_path.exists():
                 self.engine.add_documents([txt_path])
 
-            return analysis_data
-
-        results: Dict[str, ExtractionResult] = {}
+            return {"status": "success", "results": [analysis_data]}
 
         if input_path.is_dir():
+            logger.info("Processing directory: %s", input_path)
             self.processor.process_directory(input_path)
-            txt_files = list(input_path.glob("*.txt"))
-            for txt_file in txt_files:
-                if txt_file.name == "all_extracted.txt":
-                    continue
-                extraction_res = self.pipeline.process(txt_file)
-                results[txt_file.stem + ".pdf"] = extraction_res
 
+            batch_results = self.process_batch(input_path)
+
+            # Build index for all processed text files
             self.engine.build_index()
 
-        return results
+            return {
+                "status": "success",
+                "total_files": len(batch_results),
+                "results": batch_results,
+            }
+
+        return {"status": "error", "message": f"Invalid input path: {input_path}"}
 
     def generate_report(
         self, analysis_data: Dict[str, Any], output_path: Optional[Path] = None
@@ -142,13 +142,24 @@ class RiskAnalysisService:
         return report
 
     def process_batch(self, directory: Path) -> List[Dict[str, Any]]:
-        """批量处理目录下的所有 PDF"""
+        """
+        批量处理目录下的所有 PDF。
+        通过 try-except 确保单个文件失败不会中断整体流程。
+        """
         results = []
-        for pdf in directory.glob("*.pdf"):
+        pdf_files = sorted(list(directory.glob("*.pdf")))
+        for pdf in pdf_files:
             try:
                 results.append(self.analyze_document(pdf))
             except Exception as exc:
-                logger.error("Failed to analyze %s: %s", pdf.name, exc)
+                logger.error("Critical failure analyzing %s: %s", pdf.name, exc, exc_info=True)
+                # We can still add a placeholder for the failed file if needed
+                results.append(
+                    {
+                        "document_info": {"name": pdf.name, "path": str(pdf), "status": "failed"},
+                        "error": str(exc),
+                    }
+                )
         return results
 
     def query_risk(self, question: str):

@@ -76,13 +76,19 @@ elif page == "文档分析":
 
         if st.button("开始提取风险实体"):
             with st.spinner("正在提取..."):
-                result = service.pipeline.process(txt_path)
+                # Use service.analyze_document if it's a PDF,
+                # but since we list .txt files here, we might need a direct pipeline call or a service method for text
+                # To be consistent with the plan, we should use the service layer.
+                # If we have the .txt, it means it's already processed by OCR.
+                # Let's assume we want the full analysis report if possible,
+                # but for a specific text file, we use the pipeline through service.
+                extraction_res = service.pipeline.process(txt_path)
 
-                st.subheader(f"风险等级: {result.risk_level}")
-                st.metric("总风险评分", result.total_risk_score)
+                st.subheader(f"风险等级: {extraction_res.risk_level}")
+                st.metric("总风险评分", extraction_res.total_risk_score)
 
-                if result.entities:
-                    entities_df = pd.DataFrame([e.to_dict() for e in result.entities])
+                if extraction_res.entities:
+                    entities_df = pd.DataFrame([e.to_dict() for e in extraction_res.entities])
                     st.dataframe(entities_df, use_container_width=True)
                 else:
                     st.success("未检测到显著风险实体。")
