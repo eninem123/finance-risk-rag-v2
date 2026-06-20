@@ -8,7 +8,7 @@ Finance-Risk-RAG 配置模块
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 
 @dataclass
@@ -65,16 +65,6 @@ class Config:
     risk_level_medium: int = 60
     risk_level_high: int = 90
 
-    # BERT 实体类型分值映射
-    bert_risk_mapping: Dict[str, int] = field(
-        default_factory=lambda: {
-            "RISK": 30,
-            "MONEY": 25,
-            "ORG": 15,
-            "PER": 5,
-        }
-    )
-
     # ==================== 处理配置 ====================
 
     chunk_size: int = 800
@@ -99,13 +89,7 @@ class Config:
 
     def _resolve_paths(self) -> None:
         # 将相对路径转换为绝对路径
-        for attr in [
-            "chroma_db_dir",
-            "cache_dir",
-            "log_dir",
-            "docs_dir",
-            "knowledge_base_dir",
-        ]:
+        for attr in ["chroma_db_dir", "cache_dir", "log_dir", "docs_dir", "knowledge_base_dir"]:
             path_val = getattr(self, attr)
             if not path_val.is_absolute():
                 setattr(self, attr, self.base_dir / path_val)

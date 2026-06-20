@@ -14,7 +14,7 @@ def test_llm_retry_logic():
         MagicMock(choices=[MagicMock(message=MagicMock(content="Success"))]),
     ]
 
-    with patch("src.finance_risk_rag.llm.OpenAI", return_value=mock_client):
+    with patch("openai.OpenAI", return_value=mock_client):
         wrapper = LLMClientWrapper(api_key="test")
         # Set short initial backoff for fast testing
         result = wrapper.chat([{"role": "user", "content": "hi"}], initial_backoff=0.01)
@@ -26,7 +26,7 @@ def test_llm_failure_after_retries():
     mock_client = MagicMock()
     mock_client.chat.completions.create.side_effect = Exception("Permanent Error")
 
-    with patch("src.finance_risk_rag.llm.OpenAI", return_value=mock_client):
+    with patch("openai.OpenAI", return_value=mock_client):
         wrapper = LLMClientWrapper(api_key="test")
         with pytest.raises(LLMError, match="LLM call failed after 3 retries"):
             wrapper.chat([{"role": "user", "content": "hi"}], initial_backoff=0.01)

@@ -18,8 +18,6 @@ class Entity:
     text: str
     risk_score: int
     confidence: float
-    start_char: int = -1
-    end_char: int = -1
     context: str = ""
     source: str = "rule"
     start_char: int = 0
@@ -33,8 +31,6 @@ class Entity:
             "text": self.text,
             "risk_score": self.risk_score,
             "confidence": round(self.confidence, 4),
-            "start_char": self.start_char,
-            "end_char": self.end_char,
             "context": self.context,
             "source": self.source,
             "start_char": self.start_char,
@@ -55,16 +51,13 @@ class ExtractionResult:
     entities: List[Entity]
     total_risk_score: int
     risk_level: str
-    model_version: str = "v1.0"
     extraction_time: str = field(default_factory=lambda: datetime.now().isoformat())
-    model_version: str = "v2.2"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "extracted_at": self.extraction_time,
-            "model_version": self.model_version,
             "total_entities": len(self.entities),
             "total_risk_score": self.total_risk_score,
             "risk_level": self.risk_level,

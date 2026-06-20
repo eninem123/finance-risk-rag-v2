@@ -93,6 +93,7 @@ Desktop.ini
 *.tmp
 *.temp
 *.pid
+MagicMock/
 
 # Package files
 *.zip

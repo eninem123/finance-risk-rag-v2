@@ -1,176 +1,117 @@
-<div align="center">
+# Finance-Risk-RAG v2.2
 
-# 🏦 Finance-Risk-RAG v2.2
+<div align="center">
 
 **银行级多语言财务文本风控 AI 系统**
-**Professional Enterprise-Grade Financial Risk AI Analytics System**
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![Code Style](https://img.shields.io/badge/Code_Style-Black-000000?style=for-the-badge)](https://github.com/psf/black)
-[![RAG](https://img.shields.io/badge/RAG-Retriever-FF6B6B?style=for-the-badge)]()
-[![BERT](https://img.shields.io/badge/NLP-BERT-yellow?style=for-the-badge)]()
+[![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-v2.2-blue?style=flat-square)]()
 
-**智能 OCR 识别 · BERT 深度提取 · 自动风险评估 · RAG 辅助决策**
+OCR 智能识别 · BERT 实体提取 · RAG 风险问答 · Streamlit 可视化面板
 
 </div>
 
 ---
 
-## 🎯 项目愿景
+## 项目简介
 
-Finance-Risk-RAG 是一套专为**银行、保险、审计及合规部门**打造的专业级财务风险控制系统。
+Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，整合 OCR、BERT 实体提取、规则引擎与 RAG 检索增强生成，支持批量 PDF 处理、风险实体识别与智能问答。
 
-系统针对金融领域复杂的 PDF 报表、扫描件、审计报告等非结构化数据，通过 **Service Orchestration (服务编排)** 架构，实现了从原始文档到深度风险报告的全流程自动化分析。
-
-> 🛡️ **核心使命**：将资深风控专家的分析逻辑转化为可扩展的 AI 工作流，显著降低贷前/贷后审核的人为疏漏。
+> 本仓库为**个人闲置测试项目**，代码已收敛至 `main` 主线 v2.2 稳定版。
 
 ---
 
-## ✨ 核心能力
+## v2.2 核心能力
 
-### 🏗️ 工业级服务编排 (New in v2.5)
-- **RiskAnalysisService**: 统一业务层，协调 OCR、分类、实体识别与报告生成。
-- **Pipeline 模式**: 模块化设计，支持根据业务需求灵活扩展提取规则。
-
-### 📑 深度文档处理
-- **Hybrid OCR Engine**: 结合 `pdfplumber` 文本提取与 `Tesseract 5.x` 图像识别。
-- **Image Enhancement**: 自动亮度、对比度优化及去噪，显著提升扫描件识别率。
-- **AI Classification**: 自动识别审计报告、行业报告、财报等 6+ 类金融文档。
-
-### 🔍 精准风险实体识别
-- **Dual-Engine Extraction**: 规则引擎（高准确度）+ BERT 模型（高泛化性）协同工作。
-- **Position-Based Arbitration**: 基于字符偏移量的智能去重与仲裁，处理重叠实体。
-- **Multi-Class Support**: 精准识别风险点、金额、组织架构、关键人物等 17 类实体。
-
-### 🏗️ 企业级架构
-- **Service 编排层**：统一调度 OCR、NLP 与 RAG 模块
-- **交互式 Dashboard**：基于 Streamlit 的可视化风险分析面板
-- 模块化设计，易于集成与扩展
-- 统一配置管理，灵活适配不同场景
-- 完整的异常处理与日志体系
-- **统一 CLI 入口** + **Streamlit Web 仪表盘**
+| 模块 | 说明 |
+|------|------|
+| `RiskAnalysisService` | 业务编排层，协调 OCR → 分类 → 提取 → RAG |
+| `dashboard.py` | Streamlit 交互式面板（数据总览 / 文档分析 / 风险检索） |
+| `main.py report` | 生成 Markdown + JSON 综合风险报告 |
+| BERT 长文本切片 | 滑动窗口 Overlap Chunking，支持长文档 |
+| 精准偏移定位 | Entity 模型含 `start_char` / `end_char` |
 
 ---
 
-## 📊 业务价值
+## 快速开始
 
-| 维度 | 传统模式 | Finance-Risk-RAG | 提升 |
-|:--- |:--- |:--- |:---:|
-| **处理耗时** | 4-6 小时/份 | < 2 分钟/份 | **~98%** |
-| **覆盖深度** | 抽样检查 | 100% 全量扫描 | **全面性** |
-| **一致性** | 易受主观影响 | 标准化量化评分 | **客观性** |
-| **合规性** | 手工记录 | 自动生成审计轨迹 | **规范化** |
-
-    subgraph "Service Layer"
-    I[RiskAnalysisService]
-    end
-
-    I --> B
-    I --> E
-    I --> G
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      输入层 (Input Layer)                    │
-│          PDF 文档  │  扫描件  │  Word  │  Excel              │
-├─────────────────────────────────────────────────────────────┤
-│                    处理层 (Processing Layer)                 │
-│  OCR 识别  →  文本清洗  →  AI 文档分类  →  结构解析         │
-├─────────────────────────────────────────────────────────────┤
-│                    编排层 (Service Layer)                    │
-│        RiskAnalysisService 全流程调度与业务逻辑编排         │
-├─────────────────────────────────────────────────────────────┤
-│                     分析层 (Analysis Layer)                  │
-│  实体提取 (BERT/Rule)  →  重叠仲裁  →  风险评分  →  关系图谱 │
-├─────────────────────────────────────────────────────────────┤
-│                     应用层 (Application Layer)               │
-│  RAG 问答  │  可视化 Dashboard  │  风险报告  │  预警推送     │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 🚀 快速开始
-
-### 安装部署
-
-### 1. 环境准备
 ```bash
-# 克隆仓库
 git clone https://github.com/eninem123/finance-risk-rag-v2.git
 cd finance-risk-rag-v2
-
-# 安装依赖
 pip install -r requirements.txt
 
-# 设置 API 密钥 (可选，用于分类与 Q&A)
-export MOONSHOT_API_KEY="your_api_key_here"
-```
-
-### 2. 生成风险报告 (核心功能)
-```bash
-# 全流程处理（OCR + 实体提取 + RAG 索引）
+# 全流程处理
 python main.py process --input ./docs/
 
-# 启动可视化 Dashboard
-python main.py dashboard
-# 或者直接运行: streamlit run dashboard.py
-
-# 命令行交互式查询
+# RAG 问答
 python main.py query "这笔贷款有哪些风险点？"
+
+# 生成风险报告
+python main.py report --input document.pdf --output-dir reports/
+
+# 启动可视化面板
+python main.py dashboard
 ```
 
 ---
 
-## 📂 模块化架构
+## 项目结构
 
 ```
-src/finance_risk_rag/
-├── service.py      # 🌟 核心：风险分析编排服务
-├── processor.py    # 文档处理 (OCR, Image, Classification)
-├── extractor.py    # 实体识别 (Rule, BERT, Arbitration)
-├── engine.py       # RAG 检索与问答核心
-├── llm.py          # LLM 客户端封装 (带重试机制)
-├── config.py       # 系统配置与环境变量
-├── models.py       # 统一数据契约
-├── utils.py        # 文本处理与通用工具
-└── exceptions.py   # 业务级异常体系
+finance-risk-rag-v2/
+├── src/finance_risk_rag/
+│   ├── service.py          # 业务编排服务层 (v2.2)
+│   ├── extractor.py        # 实体提取管道
+│   ├── processor.py        # 文档 OCR 处理
+│   ├── engine.py           # RAG 引擎
+│   └── ...
+├── dashboard.py            # Streamlit 可视化面板
+├── main.py                 # 统一 CLI 入口
+├── tests/                  # 单元测试
+└── .github/workflows/      # CI（仅 PR → main 触发）
 ```
 
 ---
 
-## 🤝 贡献与反馈
+## 2026-06 仓库整理记录
 
-| 领域 | 选型 |
-|:--- |:--- |
-| **文本分析** | Python 3.12, NLTK, Jieba, Regex |
-| **深度学习** | Transformers (BERT), PyTorch |
-| **向量存储** | ChromaDB, ONNX |
-| **大模型** | OpenAI API / Moonshot AI |
-| **OCR/图像** | Tesseract OCR, pdfplumber, PIL |
-| **工程化** | Pytest, Black, Mypy, Flake8 |
+### 合并 PR（#11–#17 → main）
+
+| PR | 分支 | 内容 |
+|----|------|------|
+| #11 | `feature/professional-v2.1-optimization-*` | v2.1 架构优化 |
+| #12 | `feature/enterprise-optimization-*` | 企业服务层 + 报告生成 |
+| #13 | `optimize-finance-risk-rag-v2.2-*` | v2.2 服务层重构 |
+| #14 | `feature/professional-refactoring-and-dashboard-*` | 服务层 + 仪表盘 |
+| #15 | `feature/v2.2-optimization-7723*` | v2.2 架构升级 |
+| #16 | `feature/optimize-architecture-v2.2-*` | 架构优化 + Dashboard |
+| #17 | `feature/v2.2-optimization-1572*` | v2.2 全面升级 |
+| #18 | `feature/professional-refactoring-and-dashboard-v2.2-*` | **保留为唯一迭代入口** |
+
+### 删除分支（8 个 feature 临时分支）
+
+- `feature/enterprise-optimization-5050392069136229718`
+- `feature/optimize-architecture-v2.2-18168074359074526671`
+- `feature/professional-refactoring-and-dashboard-4562812990206762378`
+- `feature/professional-refactoring-and-dashboard-v2.2-2030757817022327085`
+- `feature/professional-v2.1-optimization-5571732041245732993`
+- `feature/v2.2-optimization-15723274487901237107`
+- `feature/v2.2-optimization-7723375731582770803`
+- `optimize-finance-risk-rag-v2.2-647354061673373050`
+
+### CI 降噪变更
+
+- 移除 `push` 自动触发，**仅 `pull_request → main`** 时运行
+- 取消 Python 多版本矩阵与 lint / test 重复步骤
+- 简化为单版本基础编译校验（`py_compile` + `compileall`）
+
+### Bot 降噪变更
+
+- 新增 `.cursor/rules/bot-noise-reduction.mdc`：禁止自动 PR 评论与 CI 告警回复，仅响应手动 @
 
 ---
 
-## 🧪 质量保证
+## 许可证
 
-- **单元测试**: `pytest tests/` 覆盖核心逻辑。
-- **静态检查**: `mypy`, `flake8` 确保代码类型安全与风格统一。
-- **日志体系**: 详尽的 `logs/` 记录，便于回溯处理失败的原因。
-
----
-
-## 📄 许可证
-
-本项目遵循 [MIT License](LICENSE)。
-
----
-
-<div align="center">
-
-**为金融风控注入 AI 的力量**
-
-Made with ❤️ for Financial Excellence
-
-</div>
+MIT License — 详见 [LICENSE](LICENSE)

@@ -64,8 +64,7 @@ def split_text_by_sentence(text: str, max_len: int = 400, min_len: int = 50) -> 
         return []
 
     # 改进的句子分隔符，更好地处理中英文混排
-    # 避免在数字中间拆分 (e.g. 3.14)
-    sentence_seps = r"(?<!\d)([。！？；.!?;])(?![0-9.])"
+    sentence_seps = r"([。！？；.!?;])(?![0-9])"
 
     # 使用捕获分组保留分隔符
     raw_parts = re.split(sentence_seps, text)

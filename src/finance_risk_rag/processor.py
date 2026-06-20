@@ -13,7 +13,7 @@ import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
 
 from .config import get_config
-from .exceptions import LLMError, OCRError
+from .exceptions import OCRError
 from .llm import LLMClientWrapper
 from .models import ClassificationResult
 from .utils import get_file_hash, load_json_file, save_json_file
@@ -32,77 +32,53 @@ class DocumentProcessor:
             model_name=self.config.llm_model_name,
         )
         if self.config.tesseract_cmd:
-            if Path(self.config.tesseract_cmd).exists() or self.config.tesseract_cmd == "tesseract":
-                pytesseract.pytesseract.tesseract_cmd = self.config.tesseract_cmd
-            else:
-                logger.warning(
-                    f"Tesseract command not found: {self.config.tesseract_cmd}. OCR might fail."
-                )
+            pytesseract.pytesseract.tesseract_cmd = self.config.tesseract_cmd
 
     def optimize_image_for_ocr(self, image: Image.Image) -> Image.Image:
-        try:
-            image = image.convert("L")
-            image = image.filter(ImageFilter.MedianFilter(size=3))
-            enhancer = ImageEnhance.Brightness(image)
-            image = enhancer.enhance(1.2)
-            enhancer = ImageEnhance.Contrast(image)
-            image = enhancer.enhance(2.5)
-            image = image.filter(ImageFilter.SHARPEN)
-            image = image.point(lambda x: 0 if x < 140 else 255, "1")
-            return image
-        except Exception as e:
-            logger.error(f"Image optimization failed: {e}")
-            return image
+        image = image.convert("L")
+        image = image.filter(ImageFilter.MedianFilter(size=3))
+        enhancer = ImageEnhance.Brightness(image)
+        image = enhancer.enhance(1.2)
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(2.5)
+        image = image.filter(ImageFilter.SHARPEN)
+        image = image.point(lambda x: 0 if x < 140 else 255, "1")
+        return image
 
     def classify_document(self, text_sample: str) -> ClassificationResult:
-        """使用 LLM 对文档进行分类，包含 CoT 推理"""
         if not self.llm_client.is_available:
-            return ClassificationResult(
-                type="未知", confidence=0.0, reason="LLM client not initialized"
-            )
+            return ClassificationResult(type="未知", confidence=0.0, reason="LLM unavailable")
 
         prompt = f"""
-你是一名资深金融文档分析师。请分析以下财务文档样本并将其归类。
+请判断以下财务文档属于哪一类？输出 JSON 格式。
 
-【文本样本】
+文本样本：
 {text_sample[:3000]}
 
 【可选类别】
-1. 审计报告 (Audit Report)
-2. 行业报告 (Industry Research)
-3. 公司研究报告 (Company Research)
-4. 上市手册 (Prospectus/Listing Manual)
-5. 财报 (Financial Report)
-6. 其他 (Other)
-
-【分析要求】
-1. 识别文档中的关键特征（如标题、主要章节、专业术语）。
-2. 评估该文档与可选类别的匹配度。
-3. 给出最终分类及其置信度。
+1. 审计报告
+2. 行业报告
+3. 公司研究报告
+4. 上市手册
+5. 财报
+6. 其他
 
 【输出要求】
-仅输出 JSON 格式，包含 type, confidence, reason 字段。
-示例：{{"type": "审计报告", "confidence": 0.98, "reason": "文档包含独立审计意见及资产负债表..."}}
+- 仅输出 JSON 格式
+- 示例：{{"type": "行业报告", "confidence": 0.93, "reason": "..."}}
 """
         try:
             import json
 
-            # 使用稍微高一点的 temperature 以获取更好的 reason，但保持 low 以保证 type 稳定
             response = self.llm_client.chat([{"role": "user", "content": prompt}], temperature=0.2)
             start = response.find("{")
             end = response.rfind("}") + 1
-            if start == -1 or end == 0:
-                raise LLMError(f"Invalid JSON response from LLM: {response}")
-
             data = json.loads(response[start:end])
             return ClassificationResult(
                 type=data.get("type", "其他"),
                 confidence=data.get("confidence", 0.0),
                 reason=data.get("reason", ""),
             )
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            return ClassificationResult(type="解析失败", confidence=0.0, reason=f"JSON error: {e}")
         except Exception as e:
             logger.error(f"Classification failed: {e}")
             return ClassificationResult(type="未知", confidence=0.0, reason=str(e))
@@ -113,25 +89,20 @@ class DocumentProcessor:
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 for i, page in enumerate(pdf.pages):
-                    try:
-                        page_text = page.extract_text()
-                        if page_text and len(page_text.strip()) > 50:
-                            text += f"\n--- Page {i+1} (Text) ---\n{page_text}"
-                        else:
-                            logger.info(f"Page {i+1} of {pdf_path.name} requires OCR.")
-                            img = page.to_image(resolution=self.config.ocr_dpi).original
-                            img = self.optimize_image_for_ocr(img)
-                            ocr_text = pytesseract.image_to_string(
-                                img, lang=self.config.ocr_languages, config="--oem 1 --psm 3"
-                            )
-                            text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
-                            ocr_pages += 1
-                    except Exception as page_err:
-                        logger.error(f"Error processing page {i+1} of {pdf_path.name}: {page_err}")
-                        text += f"\n--- Page {i+1} (Error) ---\n[Page processing failed]"
+                    page_text = page.extract_text()
+                    if page_text and len(page_text.strip()) > 50:
+                        text += f"\n--- Page {i+1} (Text) ---\n{page_text}"
+                    else:
+                        img = page.to_image(resolution=self.config.ocr_dpi).original
+                        img = self.optimize_image_for_ocr(img)
+                        ocr_text = pytesseract.image_to_string(
+                            img, lang=self.config.ocr_languages, config="--oem 1 --psm 3"
+                        )
+                        text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
+                        ocr_pages += 1
             return text, ocr_pages
         except Exception as e:
-            logger.error(f"Critical error processing PDF {pdf_path}: {e}")
+            logger.error(f"Error processing {pdf_path}: {e}")
             raise OCRError(f"PDF extraction failed for {pdf_path}: {e}")
 
     def process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
@@ -146,7 +117,7 @@ class DocumentProcessor:
             and cached.get("ocr_version") == self.config.ocr_version
             and txt_path.exists()
         ):
-            logger.info(f"Skipping {pdf_path.name} (using cache)")
+            logger.info(f"Skipping {pdf_path.name} (cached)")
             text = txt_path.read_text(encoding="utf-8")
             classification_dict = cached.get("classification", {"type": "未知", "confidence": 0.0})
             ocr_count = cached.get("ocr_pages", 0)
@@ -168,10 +139,6 @@ class DocumentProcessor:
 
     def process_directory(self, docs_dir: Optional[Path] = None, max_workers: int = 4):
         docs_dir = docs_dir or self.config.docs_dir
-        if not docs_dir.exists():
-            logger.error(f"Directory not found: {docs_dir}")
-            return
-
         pdf_files = list(docs_dir.glob("*.pdf"))
         log = load_json_file(self.config.processing_log_path)
 
@@ -180,7 +147,7 @@ class DocumentProcessor:
         results = []
 
         if not pdf_files:
-            logger.info(f"No PDF files found in {docs_dir}.")
+            logger.info("No PDF files found to process.")
             return
 
         # 并行处理文件
@@ -196,14 +163,15 @@ class DocumentProcessor:
                     executor.submit(self.process_single_pdf, pdf): pdf for pdf in pdf_files
                 }
                 for future in as_completed(future_to_pdf):
-                    pdf = future_to_pdf[future]
                     try:
                         res = future.result()
                         results.append(res)
                     except Exception as e:
+                        pdf = future_to_pdf[future]
                         logger.error(f"Failed to process {pdf.name}: {e}")
 
-        # 聚合结果并更新日志
+        # 聚合结果并更新日志 (保持某种程度的顺序以便合并)
+        # Sort by name to keep all_extracted.txt consistent
         results.sort(key=lambda x: x["name"])
 
         for res in results:
@@ -220,4 +188,3 @@ class DocumentProcessor:
         (docs_dir / "all_extracted.txt").write_text(all_text, encoding="utf-8")
         save_json_file(classifications, docs_dir / "classification.json")
         save_json_file(log, self.config.processing_log_path)
-        logger.info(f"Directory processing complete. Processed {len(results)} files.")

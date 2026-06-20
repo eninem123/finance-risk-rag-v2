@@ -5,7 +5,7 @@ Finance-Risk-RAG RAG 引擎模块
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, cast
+from typing import List
 
 import chromadb
 from chromadb.utils import embedding_functions as ef
@@ -60,10 +60,9 @@ class RAGEngine:
                     existing = self._collection.get(
                         where={"source": txt_file.name}, include=["metadatas"]
                     )
-                    metadatas = cast(List[Dict[str, Any]], existing.get("metadatas", []))
-                    if metadatas:
+                    if existing and existing["metadatas"]:
                         # 检查第一个 chunk 的 hash 是否一致
-                        if metadatas[0].get("hash") == current_hash:
+                        if existing["metadatas"][0].get("hash") == current_hash:
                             logger.info(f"Skipping indexing for {txt_file.name} (unchanged)")
                             continue
                         else:
@@ -76,56 +75,33 @@ class RAGEngine:
                 sentences = split_text_by_sentence(cleaned, max_len=self.config.chunk_size)
 
                 documents = []
-                metadatas_to_add = []
+                metadatas = []
                 ids = []
 
                 for i, sent in enumerate(sentences):
                     documents.append(sent)
-                    metadatas_to_add.append(
+                    metadatas.append(
                         {"source": txt_file.name, "chunk_index": i, "hash": current_hash}
                     )
                     ids.append(f"{txt_file.name}_{i}")
 
                 if documents:
-                    self._collection.add(documents=documents, metadatas=metadatas_to_add, ids=ids)
+                    self._collection.add(documents=documents, metadatas=metadatas, ids=ids)
                     logger.info(f"Indexed {len(documents)} chunks from {txt_file.name}")
             except Exception as e:
                 logger.error(f"Failed to index {txt_file}: {e}")
 
-    def query(
-        self, question: str, top_k: int = 10, confidence_threshold: float = 0.5
-    ) -> QueryResult:
+    def query(self, question: str, top_k: int = 4) -> QueryResult:
         try:
             results = self._collection.query(query_texts=[question], n_results=top_k)
 
-            documents = results.get("documents", [[]])
-            metadatas = results.get("metadatas", [[]])
+            docs = results.get("documents", [[]])[0]
+            metas = results.get("metadatas", [[]])[0]
 
-            if not documents or not documents[0]:
-                return QueryResult(answer="未找到相关信息。", sources=[], confidence=0.0)
-
-            docs = documents[0]
-            metas = cast(List[Dict[str, Any]], metadatas[0])
-
-            # 简单的置信度过滤 (距离越小，置信度越高)
-            filtered_docs = []
-            filtered_metas = []
-            for doc, meta, dist in zip(all_docs, all_metas, all_distances):
-                # ChromaDB 默认使用 L2 距离，这里做一个简单的归一化模拟
-                confidence = 1.0 / (1.0 + dist)
-                if confidence >= confidence_threshold:
-                    filtered_docs.append(doc)
-                    filtered_metas.append(meta)
-
-            if not filtered_docs:
-                # 如果过滤后为空，回退到取前 2 个，或者提示无相关信息
-                filtered_docs = all_docs[:2]
-                filtered_metas = all_metas[:2]
-
-            context = "\n\n".join(filtered_docs)
+            context = "\n\n".join(docs)
             answer = self.llm_client.ask(question, context)
 
-            return QueryResult(answer=answer, sources=filtered_metas, confidence=1.0)
+            return QueryResult(answer=answer, sources=metas, confidence=1.0)
         except Exception as e:
             raise RAGError(f"Query failed: {e}")
 
