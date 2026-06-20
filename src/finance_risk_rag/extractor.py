@@ -78,12 +78,16 @@ class RuleBasedExtractor:
 class BERTExtractor:
     """基于 BERT 的实体提取器"""
 
-    def __init__(self, model_path: Optional[Path] = None):
+    def __init__(self, config=None, model_path: Optional[Path] = None):
+        self.config = config or get_config()
         self.model = None
         self.tokenizer = None
         self.device = None
+        self._nlp = None
         if model_path and model_path.exists():
             self.load_model(model_path)
+        elif self.config.bert_local_path and self.config.bert_local_path.exists():
+            self.load_model(self.config.bert_local_path)
 
     def load_model(self, model_path: Path):
         try:
@@ -97,7 +101,7 @@ class BERTExtractor:
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
             self.device = 0 if torch.cuda.is_available() else -1
-            self.nlp = pipeline(
+            self._nlp = pipeline(
                 "ner",
                 model=self.model,
                 tokenizer=self.tokenizer,
@@ -110,7 +114,21 @@ class BERTExtractor:
             self.model = None
 
     def is_available(self) -> bool:
-        return self.model is not None
+        return self._nlp is not None
+
+    def _chunk_text(
+        self, text: str, max_length: int = 512, overlap: int = 50
+    ) -> List[Tuple[str, int]]:
+        """将长文本切分为带偏移量的块"""
+        chunks = []
+        start = 0
+        while start < len(text):
+            end = start + max_length
+            chunks.append((text[start:end], start))
+            if end >= len(text):
+                break
+            start += max_length - overlap
+        return chunks
 
     def extract(self, text: str) -> List[Entity]:
         if not self.is_available() or not text:
@@ -131,11 +149,14 @@ class BERTExtractor:
                         start_char=res["start"],
                         end_char=res["end"],
                     )
-                )
-            return entities
+            return all_entities
         except Exception as e:
             logger.error(f"BERT extraction failed: {e}")
             return []
+
+    def _get_risk_score(self, entity_group: str) -> int:
+        """从配置中获取风险分数"""
+        return self.config.bert_risk_mapping.get(entity_group, 20)
 
 
 class EntityExtractionPipeline:
@@ -144,7 +165,7 @@ class EntityExtractionPipeline:
     def __init__(self, config=None, rule_extractor=None, bert_extractor=None):
         self.config = config or get_config()
         self.rule_extractor = rule_extractor or RuleBasedExtractor(config=self.config)
-        self.bert_extractor = bert_extractor or BERTExtractor(self.config.bert_local_path)
+        self.bert_extractor = bert_extractor or BERTExtractor(config=self.config)
 
     def process(self, text_or_path: Union[str, Path]) -> ExtractionResult:
         if isinstance(text_or_path, Path):
@@ -171,7 +192,7 @@ class EntityExtractionPipeline:
         self, rule_entities: List[Entity], bert_entities: List[Entity]
     ) -> List[Entity]:
         """
-        合并规则引擎和 BERT 的结果，处理重叠。
+        合并规则引擎和 BERT 的结果，处理位置重叠。
         优先考虑高分和高置信度的实体。
         """
         all_entities = rule_entities + bert_entities
@@ -185,6 +206,9 @@ class EntityExtractionPipeline:
 
         for current in all_entities:
             is_redundant = False
+            curr_start = current.metadata.get("start_char", -1)
+            curr_end = current.metadata.get("end_char", -1)
+
             for existing in final_entities:
                 # 使用字符偏移量进行精确的重叠检测
                 overlap = max(current.start_char, existing.start_char) < min(

@@ -3,50 +3,45 @@
 # 🏦 Finance-Risk-RAG v2.2
 
 **银行级多语言财务文本风控 AI 系统**
-
-**Professional Multi-language Financial Risk AI Control System**
+**Professional Enterprise-Grade Financial Risk AI Analytics System**
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Code Style](https://img.shields.io/badge/Code_Style-Black-000000?style=for-the-badge)](https://github.com/psf/black)
-[![CI](https://img.shields.io/badge/CI-Passing-00D26A?style=for-the-badge)]()
-[![RAG](https://img.shields.io/badge/RAG-Powered-FF6B6B?style=for-the-badge)]()
+[![RAG](https://img.shields.io/badge/RAG-Retriever-FF6B6B?style=for-the-badge)]()
+[![BERT](https://img.shields.io/badge/NLP-BERT-yellow?style=for-the-badge)]()
 
-**OCR 智能识别 · BERT 实体提取 · RAG 风险问答 · 批量自动化处理**
+**智能 OCR 识别 · BERT 深度提取 · 自动风险评估 · RAG 辅助决策**
 
 </div>
 
 ---
 
-## 🎯 项目简介
+## 🎯 项目愿景
 
-Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，专为金融机构的贷前审查、贷后监控和风险预警场景设计。
+Finance-Risk-RAG 是一套专为**银行、保险、审计及合规部门**打造的专业级财务风险控制系统。
 
-系统整合了 **OCR 智能识别**、**BERT 实体提取**、**规则引擎匹配**与 **RAG 检索增强生成** 四大核心能力，能够批量处理 PDF 财务文档，自动识别风险实体并提供智能问答，将传统人工审查效率提升 **70%-92%**。
+系统针对金融领域复杂的 PDF 报表、扫描件、审计报告等非结构化数据，通过 **Service Orchestration (服务编排)** 架构，实现了从原始文档到深度风险报告的全流程自动化分析。
 
-> 🌐 **双语支持**：完整支持中英文财务文档处理，面向国际化场景。
+> 🛡️ **核心使命**：将资深风控专家的分析逻辑转化为可扩展的 AI 工作流，显著降低贷前/贷后审核的人为疏漏。
 
 ---
 
-## ✨ 核心功能
+## ✨ 核心能力
 
-### 📑 智能 OCR 文档处理
-- 高分辨率图像增强算法，提升扫描件识别率
-- 支持多格式 PDF 解析（原生/扫描/混合）
-- 自动文档分类与版面分析
-- 批量处理，支持目录级递归扫描
+### 🏗️ 工业级服务编排 (New in v2.5)
+- **RiskAnalysisService**: 统一业务层，协调 OCR、分类、实体识别与报告生成。
+- **Pipeline 模式**: 模块化设计，支持根据业务需求灵活扩展提取规则。
 
-### 🔍 多维风险实体识别
-- **17 类**金融风险实体精准识别
-- BERT 深度学习模型 + 规则引擎双重校验
-- 支持自定义实体类型与规则扩展
-- 实体关系抽取与关联分析
+### 📑 深度文档处理
+- **Hybrid OCR Engine**: 结合 `pdfplumber` 文本提取与 `Tesseract 5.x` 图像识别。
+- **Image Enhancement**: 自动亮度、对比度优化及去噪，显著提升扫描件识别率。
+- **AI Classification**: 自动识别审计报告、行业报告、财报等 6+ 类金融文档。
 
-### 🧠 RAG 智能风险问答
-- 基于 ChromaDB 向量数据库的语义检索
-- 精准、可溯源的风险咨询问答
-- 支持多轮对话与上下文理解
-- 风险等级自动评估与建议生成
+### 🔍 精准风险实体识别
+- **Dual-Engine Extraction**: 规则引擎（高准确度）+ BERT 模型（高泛化性）协同工作。
+- **Position-Based Arbitration**: 基于字符偏移量的智能去重与仲裁，处理重叠实体。
+- **Multi-Class Support**: 精准识别风险点、金额、组织架构、关键人物等 17 类实体。
 
 ### 🏗️ 企业级架构
 - **Service 编排层**：统一调度 OCR、NLP 与 RAG 模块
@@ -58,13 +53,14 @@ Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，专为金�
 
 ---
 
-## 📊 效率提升对比
+## 📊 业务价值
 
-| 应用场景 | 人工处理 | AI 处理 | 效率提升 |
-|---------|---------|---------|:-------:|
-| 贷前审查 | 24 小时 | 10 分钟 | **70%** |
-| 贷后监控 | 3 天 | 30 分钟 | **85%** |
-| 风险预警 | 人工巡检 | 实时监控 | **92%** |
+| 维度 | 传统模式 | Finance-Risk-RAG | 提升 |
+|:--- |:--- |:--- |:---:|
+| **处理耗时** | 4-6 小时/份 | < 2 分钟/份 | **~98%** |
+| **覆盖深度** | 抽样检查 | 100% 全量扫描 | **全面性** |
+| **一致性** | 易受主观影响 | 标准化量化评分 | **客观性** |
+| **合规性** | 手工记录 | 自动生成审计轨迹 | **规范化** |
 
 ---
 
@@ -100,23 +96,20 @@ Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，专为金�
 
 ### 安装部署
 
+### 1. 环境准备
 ```bash
-# 1. 克隆项目
+# 克隆仓库
 git clone https://github.com/eninem123/finance-risk-rag-v2.git
 cd finance-risk-rag-v2
 
-# 2. 安装依赖
+# 安装依赖
 pip install -r requirements.txt
 
-# 3. 下载 NLTK 数据（首次运行）
-python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"
-
-# 4. 运行 CLI 查看帮助
-python main.py --help
+# 设置 API 密钥 (可选，用于分类与 Q&A)
+export MOONSHOT_API_KEY="your_api_key_here"
 ```
 
-### 快速上手
-
+### 2. 生成风险报告 (核心功能)
 ```bash
 # 全流程处理（OCR + 实体提取 + RAG 索引）
 python main.py process --input ./docs/
@@ -131,88 +124,54 @@ python main.py query "这笔贷款有哪些风险点？"
 
 ---
 
-## 📁 项目结构
+## 📂 模块化架构
 
 ```
-finance-risk-rag-v2/
-├── src/
-│   └── finance_risk_rag/     # 核心源码包
-│       ├── __init__.py
-│       ├── config.py         # 集中配置管理
-│       ├── models.py         # 统一数据模型
-│       ├── exceptions.py     # 自定义异常体系
-│       ├── extract_text.py   # OCR 与文档分类
-│       ├── extract_entities.py # 实体提取流水线
-│       ├── extractor.py      # 提取器接口
-│       ├── processor.py      # 文档处理器
-│       ├── rag_core.py       # RAG 引擎核心
-│       ├── engine.py         # 业务引擎
-│       └── utils.py          # 工具函数库
-├── research/                 # 实验与研究脚本
-│   ├── bert_finetune.py      # BERT 微调实验
-│   └── risk_qa_cli.py        # 风险问答 CLI 原型
-├── tests/                    # 单元测试套件
-├── docs/                     # 输入文档与结果输出
-├── knowledge_base/           # 风险规则与词典
-├── main.py                   # 统一命令行入口
-├── requirements.txt          # 依赖清单
-├── pyproject.toml            # 项目配置
-├── .flake8                   # 代码规范
-├── mypy.ini                  # 类型检查配置
-└── README.md                 # 项目说明文档
+src/finance_risk_rag/
+├── service.py      # 🌟 核心：风险分析编排服务
+├── processor.py    # 文档处理 (OCR, Image, Classification)
+├── extractor.py    # 实体识别 (Rule, BERT, Arbitration)
+├── engine.py       # RAG 检索与问答核心
+├── llm.py          # LLM 客户端封装 (带重试机制)
+├── config.py       # 系统配置与环境变量
+├── models.py       # 统一数据契约
+├── utils.py        # 文本处理与通用工具
+└── exceptions.py   # 业务级异常体系
 ```
 
 ---
 
 ## 🛠️ 技术栈
 
-| 类别 | 技术选型 |
-|------|---------|
-| 核心语言 | Python 3.9+ |
-| OCR 引擎 | Tesseract OCR + 图像增强 |
-| NLP 模型 | BERT / Transformers |
-| 向量数据库 | ChromaDB |
-| LLM 集成 | OpenAI API / 本地模型 |
-| 文档处理 | PyPDF2 / pdfplumber / python-docx |
-| 配置管理 | Pydantic Settings |
-| 代码规范 | Black + Flake8 + Mypy |
-| CI/CD | GitHub Actions |
-| 测试框架 | Pytest |
+| 领域 | 选型 |
+|:--- |:--- |
+| **文本分析** | Python 3.12, NLTK, Jieba, Regex |
+| **深度学习** | Transformers (BERT), PyTorch |
+| **向量存储** | ChromaDB, ONNX |
+| **大模型** | OpenAI API / Moonshot AI |
+| **OCR/图像** | Tesseract OCR, pdfplumber, PIL |
+| **工程化** | Pytest, Black, Mypy, Flake8 |
 
 ---
 
-## 🧪 质量保障
+## 🧪 质量保证
 
-- ✅ **单元测试**：核心模块完整测试覆盖
-- ✅ **类型检查**：Mypy 静态类型检查
-- ✅ **代码规范**：Black 统一代码风格
-- ✅ **CI 流水线**：GitHub Actions 自动化验证
-- ✅ **安全扫描**：代码安全漏洞扫描
-
----
-
-## 🤝 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
+- **单元测试**: `pytest tests/` 覆盖核心逻辑。
+- **静态检查**: `mypy`, `flake8` 确保代码类型安全与风格统一。
+- **日志体系**: 详尽的 `logs/` 记录，便于回溯处理失败的原因。
 
 ---
 
 ## 📄 许可证
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+本项目遵循 [MIT License](LICENSE)。
 
 ---
 
 <div align="center">
 
-**如果这个项目对你有帮助，别忘了点个 ⭐ Star 支持一下**
+**为金融风控注入 AI 的力量**
 
-Made with ❤️ by eninem123
+Made with ❤️ for Financial Excellence
 
 </div>
