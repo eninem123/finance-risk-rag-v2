@@ -99,7 +99,13 @@ class Config:
 
     def _resolve_paths(self) -> None:
         # 将相对路径转换为绝对路径
-        for attr in ["chroma_db_dir", "cache_dir", "log_dir", "docs_dir", "knowledge_base_dir"]:
+        for attr in [
+            "chroma_db_dir",
+            "cache_dir",
+            "log_dir",
+            "docs_dir",
+            "knowledge_base_dir",
+        ]:
             path_val = getattr(self, attr)
             if not path_val.is_absolute():
                 setattr(self, attr, self.base_dir / path_val)

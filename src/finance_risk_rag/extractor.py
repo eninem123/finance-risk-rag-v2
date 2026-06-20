@@ -278,6 +278,12 @@ class EntityExtractionPipeline:
 
         entities_list = self._merge_and_arbitrate(rule_entities, bert_entities)
 
+        # Apply scoring strategy
+        for entity in entities_list:
+            entity.risk_score = self.scoring_strategy.calculate_score(
+                entity.type, entity.risk_score, entity.confidence
+            )
+
         total_risk = sum(e.risk_score for e in entities_list)
         risk_level = calculate_risk_level(total_risk)
 
@@ -294,6 +300,7 @@ class EntityExtractionPipeline:
         """
         合并规则引擎和 BERT 的结果，处理位置重叠。
         优先考虑高分和高置信度的实体。
+        使用字符偏移量进行精确的重叠检测。
         """
         all_entities = rule_entities + bert_entities
         if not all_entities:

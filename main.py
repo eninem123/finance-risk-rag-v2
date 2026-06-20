@@ -36,7 +36,10 @@ def main():
         "--input", type=str, default="docs/all_extracted.txt", help="输入文本文件"
     )
     extract_parser.add_argument(
-        "--output", type=str, default="docs/entities_extracted.json", help="输出 JSON 文件"
+        "--output",
+        type=str,
+        default="docs/entities_extracted.json",
+        help="输出 JSON 文件",
     )
 
     # Query 子命令
@@ -72,6 +75,13 @@ def main():
     # Report 子命令
     report_parser = subparsers.add_parser("report", help="生成全面风险报告")
     report_parser.add_argument("--input", type=str, help="PDF 文件或目录")
+
+    # Report 子命令
+    report_parser = subparsers.add_parser("report", help="生成全面风险报告")
+    report_parser.add_argument("--dir", type=str, help="文档目录")
+    report_parser.add_argument(
+        "--md", type=str, default="risk_report.md", help="输出 Markdown 文件名"
+    )
 
     args = parser.parse_args()
     config = get_config()
