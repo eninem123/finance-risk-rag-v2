@@ -58,6 +58,13 @@ def main():
     report_parser.add_argument("--input", type=str, required=True, help="输入 PDF 文件或目录")
     report_parser.add_argument("--output", type=str, default="reports", help="输出目录")
 
+    # Report 子命令
+    report_parser = subparsers.add_parser("report", help="生成综合风险报告")
+    report_parser.add_argument("--dir", type=str, help="文档目录")
+    report_parser.add_argument(
+        "--output", type=str, default="docs/risk_report.json", help="输出路径"
+    )
+
     args = parser.parse_args()
     config = get_config()
     setup_logger("finance_risk_rag")

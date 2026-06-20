@@ -10,6 +10,7 @@ from src.finance_risk_rag.processor import DocumentProcessor
 
 
 
+
 def test_processor_parallel_execution(mock_config):
     # Create mock PDF files
     (mock_config.docs_dir / "test1.pdf").write_text("dummy")

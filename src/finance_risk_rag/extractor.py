@@ -7,7 +7,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from .config import get_config
 from .exceptions import ExtractionError
@@ -168,6 +168,20 @@ class BERTExtractor:
             start = end - overlap
         return chunks
 
+    def _chunk_text(
+        self, text: str, max_length: int = 510, overlap: int = 50
+    ) -> List[Tuple[str, int]]:
+        """将文本切分为带偏移量的块，以适应 BERT 限制"""
+        chunks = []
+        start = 0
+        while start < len(text):
+            end = start + max_length
+            chunks.append((text[start:end], start))
+            if end >= len(text):
+                break
+            start += max_length - overlap
+        return chunks
+
     def extract(self, text: str) -> List[Entity]:
         if not self.is_available() or not text:
             return []
@@ -203,7 +217,13 @@ class BERTExtractor:
 class EntityExtractionPipeline:
     """实体提取管道"""
 
-    def __init__(self, config=None, rule_extractor=None, bert_extractor=None):
+    def __init__(
+        self,
+        config=None,
+        rule_extractor=None,
+        bert_extractor=None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
         self.config = config or get_config()
         self.rule_extractor = rule_extractor or RuleBasedExtractor(config=self.config)
         self.bert_extractor = bert_extractor or BERTExtractor(config=self.config)
