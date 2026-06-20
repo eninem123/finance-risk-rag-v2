@@ -57,6 +57,7 @@ class ExtractionResult:
     risk_level: str
     model_version: str = "v1.0"
     extraction_time: str = field(default_factory=lambda: datetime.now().isoformat())
+    model_version: str = "v2.2"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:

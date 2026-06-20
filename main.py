@@ -69,6 +69,10 @@ def main():
     report_parser = subparsers.add_parser("report", help="生成全流程风险报告")
     report_parser.add_argument("--dir", type=str, help="文档目录")
 
+    # Report 子命令
+    report_parser = subparsers.add_parser("report", help="生成全面风险报告")
+    report_parser.add_argument("--input", type=str, help="PDF 文件或目录")
+
     args = parser.parse_args()
     config = get_config()
     setup_logger("finance_risk_rag")
