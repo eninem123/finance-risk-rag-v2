@@ -53,6 +53,11 @@ def main():
     # Dashboard 子命令
     subparsers.add_parser("dashboard", help="启动 Streamlit 可视化面板")
 
+    # Report 子命令
+    report_parser = subparsers.add_parser("report", help="生成综合风险报告")
+    report_parser.add_argument("--input", type=str, required=True, help="输入 PDF 文件或目录")
+    report_parser.add_argument("--output", type=str, default="reports", help="输出目录")
+
     args = parser.parse_args()
     config = get_config()
     setup_logger("finance_risk_rag")
