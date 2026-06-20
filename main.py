@@ -65,6 +65,10 @@ def main():
         "--output", type=str, default="docs/risk_report.json", help="输出路径"
     )
 
+    # Report 子命令
+    report_parser = subparsers.add_parser("report", help="生成全流程风险报告")
+    report_parser.add_argument("--dir", type=str, help="文档目录")
+
     args = parser.parse_args()
     config = get_config()
     setup_logger("finance_risk_rag")

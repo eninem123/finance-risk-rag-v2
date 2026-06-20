@@ -245,7 +245,10 @@ class EntityExtractionPipeline:
         risk_level = calculate_risk_level(total_risk)
 
         return ExtractionResult(
-            entities=entities_list, total_risk_score=total_risk, risk_level=risk_level
+            entities=entities_list,
+            total_risk_score=total_risk,
+            risk_level=risk_level,
+            model_version="v2.2",
         )
 
     def _merge_and_arbitrate(
