@@ -1,4 +1,4 @@
-# Finance-Risk-RAG v2.2
+# Finance-Risk-RAG v2.3
 
 <div align="center">
 
@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-v2.2-blue?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-v2.3-blue?style=flat-square)]()
 
 OCR 智能识别 · BERT 实体提取 · RAG 风险问答 · Streamlit 可视化面板
 
@@ -18,19 +18,46 @@ OCR 智能识别 · BERT 实体提取 · RAG 风险问答 · Streamlit 可视化
 
 Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，整合 OCR、BERT 实体提取、规则引擎与 RAG 检索增强生成，支持批量 PDF 处理、风险实体识别与智能问答。
 
-> 本仓库为**个人闲置测试项目**，代码已收敛至 `main` 主线 v2.2 稳定版。
+> 本仓库为**高级金融风控优化版**，目前已升级至 v2.3。
 
 ---
 
-## v2.2 核心能力
+## 系统架构
+
+```mermaid
+graph TD
+    A[PDF/Image Docs] --> B[DocumentProcessor]
+    B --> C[OCR & Text Cleaning]
+    C --> D[LLM Classification]
+    D --> E[EntityExtractionPipeline]
+
+    subgraph Extraction Pipeline
+        E --> F[RuleBasedExtractor]
+        E --> G[BERTExtractor]
+        F --> H[ScoringStrategy]
+        G --> H
+        H --> I[Merge & Arbitrate]
+    end
+
+    I --> J[Risk Analysis Result]
+    C --> K[RAGEngine]
+    K --> L[ChromaDB Index]
+    M[User Query] --> N[RAG Search]
+    L --> N
+    N --> O[Risk Advisory Answer]
+```
+
+---
+
+## v2.3 核心能力与架构优化
 
 | 模块 | 说明 |
 |------|------|
-| `RiskAnalysisService` | 业务编排层，协调 OCR → 分类 → 提取 → RAG |
-| `dashboard.py` | Streamlit 交互式面板（数据总览 / 文档分析 / 风险检索） |
-| `main.py report` | 生成 Markdown + JSON 综合风险报告 |
-| BERT 长文本切片 | 滑动窗口 Overlap Chunking，支持长文档 |
-| 精准偏移定位 | Entity 模型含 `start_char` / `end_char` |
+| **解耦评分引擎** | 引入 `ScoringStrategy` 接口，支持可插拔的风险评分逻辑。 |
+| **长文本支持** | `BERTExtractor` 引入滑动窗口 (Sliding Window) 切片，支持任意长度文档。 |
+| **标准服务接口** | `RiskAnalysisService` 统一 API 返回格式，增强系统集成稳定性。 |
+| **银行级 OCR** | 针对财务报表优化的 Tesseract 配置与图像预处理。 |
+| **可视化面板** | 基于 Streamlit 的 v2.3 交互式面板，支持实时风险透视。 |
 
 ---
 
@@ -41,13 +68,13 @@ git clone https://github.com/eninem123/finance-risk-rag-v2.git
 cd finance-risk-rag-v2
 pip install -r requirements.txt
 
-# 全流程处理
+# 全流程处理 (OCR + 分类 + 实体提取 + RAG 索引)
 python main.py process --input ./docs/
 
-# RAG 问答
-python main.py query "这笔贷款有哪些风险点？"
+# RAG 风险咨询
+python main.py query "分析该公司的流动性风险"
 
-# 生成风险报告
+# 生成专业风险报告
 python main.py report --input document.pdf --output-dir reports/
 
 # 启动可视化面板
@@ -59,57 +86,19 @@ python main.py dashboard
 ## 项目结构
 
 ```
-finance-risk-rag-v2/
+finance_risk_rag/
 ├── src/finance_risk_rag/
-│   ├── service.py          # 业务编排服务层 (v2.2)
-│   ├── extractor.py        # 实体提取管道
-│   ├── processor.py        # 文档 OCR 处理
-│   ├── engine.py           # RAG 引擎
-│   └── ...
-├── dashboard.py            # Streamlit 可视化面板
+│   ├── service.py          # 业务编排服务层 (Standardized API)
+│   ├── extractor.py        # 实体提取 (BaseExtractor & ScoringStrategy)
+│   ├── processor.py        # 文档 OCR 处理与分类
+│   ├── engine.py           # RAG 引擎与向量检索
+│   ├── models.py           # 数据模型 (Entity, ExtractionResult, etc.)
+│   └── config.py           # 中心化配置管理
+├── dashboard.py            # Streamlit UI v2.3
 ├── main.py                 # 统一 CLI 入口
-├── tests/                  # 单元测试
-└── .github/workflows/      # CI（仅 PR → main 触发）
+├── tests/                  # 自动化测试套件
+└── docs/                   # 示例文档与说明
 ```
-
----
-
-## 2026-06 仓库整理记录
-
-### 合并 PR（#11–#17 → main）
-
-| PR | 分支 | 内容 |
-|----|------|------|
-| #11 | `feature/professional-v2.1-optimization-*` | v2.1 架构优化 |
-| #12 | `feature/enterprise-optimization-*` | 企业服务层 + 报告生成 |
-| #13 | `optimize-finance-risk-rag-v2.2-*` | v2.2 服务层重构 |
-| #14 | `feature/professional-refactoring-and-dashboard-*` | 服务层 + 仪表盘 |
-| #15 | `feature/v2.2-optimization-7723*` | v2.2 架构升级 |
-| #16 | `feature/optimize-architecture-v2.2-*` | 架构优化 + Dashboard |
-| #17 | `feature/v2.2-optimization-1572*` | v2.2 全面升级 |
-| #18 | `feature/professional-refactoring-and-dashboard-v2.2-*` | 已合并至 main（2026-06-20） |
-| #19 | `feature/professional-refactoring-and-dashboard-v2.2-*` | **当前唯一迭代入口（Draft PR）** |
-
-### 删除分支（8 个 feature 临时分支）
-
-- `feature/enterprise-optimization-5050392069136229718`
-- `feature/optimize-architecture-v2.2-18168074359074526671`
-- `feature/professional-refactoring-and-dashboard-4562812990206762378`
-- `feature/professional-refactoring-and-dashboard-v2.2-2030757817022327085`
-- `feature/professional-v2.1-optimization-5571732041245732993`
-- `feature/v2.2-optimization-15723274487901237107`
-- `feature/v2.2-optimization-7723375731582770803`
-- `optimize-finance-risk-rag-v2.2-647354061673373050`
-
-### CI 降噪变更
-
-- 移除 `push` 自动触发，**仅 `pull_request → main`** 时运行
-- 取消 Python 多版本矩阵与 lint / test 重复步骤
-- 简化为单版本基础编译校验（`py_compile` + `compileall`）
-
-### Bot 降噪变更
-
-- 新增 `.cursor/rules/bot-noise-reduction.mdc`：禁止自动 PR 评论与 CI 告警回复，仅响应手动 @
 
 ---
 

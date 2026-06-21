@@ -61,34 +61,39 @@ class RiskAnalysisService:
 
     def run_full_analysis(
         self, input_path: Path
-    ) -> Union[Dict[str, ExtractionResult], Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
         执行全流程分析：OCR -> 文档分类 -> 实体提取 -> RAG 索引构建。
-        单 PDF 返回详细分析字典，目录返回文件名到提取结果的映射。
+        统一返回结构：{"status": "success", "results": [...]}
         """
+        final_results = []
+
         if input_path.is_file() and input_path.suffix.lower() == ".pdf":
             analysis_data = self.analyze_document(input_path)
-
             txt_path = input_path.with_suffix(".txt")
             if txt_path.exists():
                 self.engine.add_documents([txt_path])
+            final_results.append(analysis_data)
 
-            return analysis_data
-
-        results: Dict[str, ExtractionResult] = {}
-
-        if input_path.is_dir():
+        elif input_path.is_dir():
             self.processor.process_directory(input_path)
-            txt_files = list(input_path.glob("*.txt"))
-            for txt_file in txt_files:
-                if txt_file.name == "all_extracted.txt":
-                    continue
-                extraction_res = self.pipeline.process(txt_file)
-                results[txt_file.stem + ".pdf"] = extraction_res
+            # 处理目录下的所有 PDF 以获取完整分析
+            pdf_files = list(input_path.glob("*.pdf"))
+            for pdf in pdf_files:
+                try:
+                    analysis = self.analyze_document(pdf)
+                    final_results.append(analysis)
+                except Exception as e:
+                    logger.error("Error analyzing %s: %s", pdf.name, e)
 
             self.engine.build_index()
 
-        return results
+        return {
+            "status": "success",
+            "count": len(final_results),
+            "results": final_results,
+            "timestamp": datetime.now().isoformat()
+        }
 
     def generate_report(
         self, analysis_data: Dict[str, Any], output_path: Optional[Path] = None

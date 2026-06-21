@@ -5,8 +5,9 @@ Finance-Risk-RAG 实体提取模块
 
 import logging
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Set, Tuple, Union
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 from .config import get_config
 from .exceptions import ExtractionError
@@ -16,10 +17,45 @@ from .utils import calculate_risk_level, clean_text, load_json_file
 logger = logging.getLogger(__name__)
 
 
-class RuleBasedExtractor:
+class ScoringStrategy(ABC):
+    """评分策略抽象基类"""
+
+    @abstractmethod
+    def calculate_score(self, entity_type: str, confidence: float, base_score: int) -> int:
+        """根据实体类型、置信度和基础分数计算最终风险分数"""
+        pass
+
+
+class DefaultScoringStrategy(ScoringStrategy):
+    """默认评分策略"""
+
+    def calculate_score(self, entity_type: str, confidence: float, base_score: int) -> int:
+        # 基础逻辑：分数 = 基础分数 * 置信度 (向上取整)
+        return int(base_score * confidence + 0.5)
+
+
+class BaseExtractor(ABC):
+    """提取器基类"""
+
+    def __init__(self, scoring_strategy: Optional[ScoringStrategy] = None):
+        self.scoring_strategy = scoring_strategy or DefaultScoringStrategy()
+
+    @abstractmethod
+    def extract(self, text: str) -> List[Entity]:
+        """从文本中提取实体"""
+        pass
+
+
+class RuleBasedExtractor(BaseExtractor):
     """基于规则的实体提取器"""
 
-    def __init__(self, config=None, rules_path: Optional[Path] = None):
+    def __init__(
+        self,
+        config=None,
+        rules_path: Optional[Path] = None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
+        super().__init__(scoring_strategy)
         self.config = config or get_config()
         self.rules = {}
         if rules_path:
@@ -47,7 +83,6 @@ class RuleBasedExtractor:
 
             for keyword in keywords:
                 # Use regex for better matching, but avoid \b for CJK
-                # Basic implementation: find all occurrences
                 for match in re.finditer(re.escape(keyword), text, re.IGNORECASE):
                     start = match.start()
                     end = match.end()
@@ -60,12 +95,17 @@ class RuleBasedExtractor:
                     context_end = min(len(text), end + 80)
                     context = text[context_start:context_end].replace("\n", " ").strip()
 
+                    confidence = 1.0
+                    risk_score = self.scoring_strategy.calculate_score(
+                        entity_type, confidence, base_risk_score
+                    )
+
                     entities.append(
                         Entity(
                             type=entity_type,
                             text=keyword,
-                            risk_score=base_risk_score,
-                            confidence=1.0,
+                            risk_score=risk_score,
+                            confidence=confidence,
                             context=context,
                             source="rule",
                             start_char=start,
@@ -75,10 +115,15 @@ class RuleBasedExtractor:
         return entities
 
 
-class BERTExtractor:
+class BERTExtractor(BaseExtractor):
     """基于 BERT 的实体提取器"""
 
-    def __init__(self, model_path: Optional[Path] = None):
+    def __init__(
+        self,
+        model_path: Optional[Path] = None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
+        super().__init__(scoring_strategy)
         self.model = None
         self.tokenizer = None
         self.device = None
@@ -112,27 +157,65 @@ class BERTExtractor:
     def is_available(self) -> bool:
         return self.model is not None
 
+    def _chunk_text(self, text: str, max_length: int = 510, overlap: int = 50) -> List[Tuple[str, int]]:
+        """
+        将文本切分为适合 BERT 的块，带有重叠。
+        返回 (块文本, 原始文本中的起始偏移) 的列表。
+        """
+        # 简单按字符切分，实际中可能需要按 token 切分更精确
+        # 这里使用保守的字符长度估计 (1 token ≈ 1-2 chars for ZH)
+        # 实际上 BERT-Chinese 通常是按字符编码的
+        chunks = []
+        start = 0
+        while start < len(text):
+            end = min(start + max_length, len(text))
+            chunks.append((text[start:end], start))
+            if end == len(text):
+                break
+            start += max_length - overlap
+        return chunks
+
     def extract(self, text: str) -> List[Entity]:
         if not self.is_available() or not text:
             return []
 
         try:
-            results = self.nlp(text)
-            entities = []
-            for res in results:
-                entities.append(
-                    Entity(
-                        type=res["entity_group"],
-                        text=res["word"],
-                        risk_score=20,  # Default risk score for BERT entities
-                        confidence=float(res["score"]),
-                        context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
-                        source="bert",
-                        start_char=res["start"],
-                        end_char=res["end"],
+            # 处理长文本：分块
+            text_chunks = self._chunk_text(text)
+            all_entities = []
+            seen_keys = set()
+
+            for chunk_text, offset in text_chunks:
+                results = self.nlp(chunk_text)
+                for res in results:
+                    entity_type = res["entity_group"]
+                    confidence = float(res["score"])
+                    text_val = res["word"]
+                    start_char = res["start"] + offset
+                    end_char = res["end"] + offset
+
+                    # 去重（对于重叠部分的重复识别）
+                    key = (entity_type, text_val, start_char)
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+
+                    # Default risk score for BERT entities is 20
+                    risk_score = self.scoring_strategy.calculate_score(entity_type, confidence, 20)
+
+                    all_entities.append(
+                        Entity(
+                            type=entity_type,
+                            text=text_val,
+                            risk_score=risk_score,
+                            confidence=confidence,
+                            context=text[max(0, start_char - 40) : min(len(text), end_char + 40)],
+                            source="bert",
+                            start_char=start_char,
+                            end_char=end_char,
+                        )
                     )
-                )
-            return entities
+            return all_entities
         except Exception as e:
             logger.error(f"BERT extraction failed: {e}")
             return []
@@ -141,10 +224,21 @@ class BERTExtractor:
 class EntityExtractionPipeline:
     """实体提取管道"""
 
-    def __init__(self, config=None, rule_extractor=None, bert_extractor=None):
+    def __init__(
+        self,
+        config=None,
+        rule_extractor=None,
+        bert_extractor=None,
+        scoring_strategy=None,
+    ):
         self.config = config or get_config()
-        self.rule_extractor = rule_extractor or RuleBasedExtractor(config=self.config)
-        self.bert_extractor = bert_extractor or BERTExtractor(self.config.bert_local_path)
+        self.scoring_strategy = scoring_strategy or DefaultScoringStrategy()
+        self.rule_extractor = rule_extractor or RuleBasedExtractor(
+            config=self.config, scoring_strategy=self.scoring_strategy
+        )
+        self.bert_extractor = bert_extractor or BERTExtractor(
+            model_path=self.config.bert_local_path, scoring_strategy=self.scoring_strategy
+        )
 
     def process(self, text_or_path: Union[str, Path]) -> ExtractionResult:
         if isinstance(text_or_path, Path):
