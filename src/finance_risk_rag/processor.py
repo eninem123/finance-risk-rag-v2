@@ -105,28 +105,60 @@ class DocumentProcessor:
             logger.error(f"Error processing {pdf_path}: {e}")
             raise OCRError(f"PDF extraction failed for {pdf_path}: {e}")
 
-    def process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
-        """处理单个 PDF 的方法，支持并行化"""
+    def process_single_pdf(self, pdf_path: Path, force: bool = False) -> Dict[str, Any]:
+        """处理单个 PDF 的核心逻辑，解耦持久化"""
         file_hash = get_file_hash(pdf_path)
         log = load_json_file(self.config.processing_log_path)
         cached = log.get(pdf_path.name, {})
         txt_path = pdf_path.with_suffix(".txt")
 
+        # 1. 检查缓存
         if (
-            cached.get("hash") == file_hash
+            not force
+            and cached.get("hash") == file_hash
             and cached.get("ocr_version") == self.config.ocr_version
             and txt_path.exists()
         ):
-            logger.info(f"Skipping {pdf_path.name} (cached)")
-            text = txt_path.read_text(encoding="utf-8")
-            classification_dict = cached.get("classification", {"type": "未知", "confidence": 0.0})
-            ocr_count = cached.get("ocr_pages", 0)
-        else:
-            logger.info(f"Processing {pdf_path.name}")
+            logger.info(f"Using cached result for {pdf_path.name}")
+            try:
+                text = txt_path.read_text(encoding="utf-8")
+                classification_dict = cached.get(
+                    "classification", {"type": "未知", "confidence": 0.0}
+                )
+                ocr_count = cached.get("ocr_pages", 0)
+                return {
+                    "name": pdf_path.name,
+                    "text": text,
+                    "classification": classification_dict,
+                    "hash": file_hash,
+                    "ocr_pages": ocr_count,
+                    "ocr_version": self.config.ocr_version,
+                }
+            except Exception as e:
+                logger.warning(f"Failed to read cache for {pdf_path.name}: {e}. Re-processing.")
+
+        # 2. 提取文本
+        logger.info(f"Extracting text from {pdf_path.name}")
+        try:
             text, ocr_count = self.extract_text_from_pdf(pdf_path)
-            txt_path.write_text(text, encoding="utf-8")
+        except Exception as e:
+            logger.error(f"Text extraction failed for {pdf_path.name}: {e}")
+            raise OCRError(f"Failed to process {pdf_path.name}: {e}")
+
+        # 3. 文档分类
+        logger.info(f"Classifying {pdf_path.name}")
+        try:
             classification = self.classify_document(text)
             classification_dict = classification.to_dict()
+        except Exception as e:
+            logger.warning(f"Classification failed for {pdf_path.name}: {e}")
+            classification_dict = {"type": "未知", "confidence": 0.0, "reason": str(e)}
+
+        # 4. 持久化 (Side effect, but necessary here for integration)
+        try:
+            txt_path.write_text(text, encoding="utf-8")
+        except Exception as e:
+            logger.error(f"Failed to save text for {pdf_path.name}: {e}")
 
         return {
             "name": pdf_path.name,

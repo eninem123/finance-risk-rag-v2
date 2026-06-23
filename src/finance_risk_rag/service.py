@@ -59,48 +59,87 @@ class RiskAnalysisService:
             "risk_analysis": extraction_result.to_dict(),
         }
 
-    def run_full_analysis(
-        self, input_path: Path
-    ) -> Union[Dict[str, ExtractionResult], Dict[str, Any]]:
+    def run_full_analysis(self, input_path: Path) -> Dict[str, Any]:
         """
         执行全流程分析：OCR -> 文档分类 -> 实体提取 -> RAG 索引构建。
-        单 PDF 返回详细分析字典，目录返回文件名到提取结果的映射。
+        统一返回结构：{"status": "success", "results": [...], "count": N}
         """
+        results_list = []
+
         if input_path.is_file() and input_path.suffix.lower() == ".pdf":
             analysis_data = self.analyze_document(input_path)
+            results_list.append(analysis_data)
 
             txt_path = input_path.with_suffix(".txt")
             if txt_path.exists():
                 self.engine.add_documents([txt_path])
 
-            return analysis_data
-
-        results: Dict[str, ExtractionResult] = {}
-
-        if input_path.is_dir():
+        elif input_path.is_dir():
+            # 批量处理 OCR
             self.processor.process_directory(input_path)
-            txt_files = list(input_path.glob("*.txt"))
-            for txt_file in txt_files:
-                if txt_file.name == "all_extracted.txt":
-                    continue
-                extraction_res = self.pipeline.process(txt_file)
-                results[txt_file.stem + ".pdf"] = extraction_res
 
+            # 对目录下的 PDF 进行分析
+            results_list = self.process_batch(input_path)["results"]
+
+            # 构建 RAG 索引
             self.engine.build_index()
 
-        return results
+        return {
+            "status": "success",
+            "results": results_list,
+            "count": len(results_list),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    def _generate_executive_summary(self, analysis_data: Dict[str, Any]) -> str:
+        """使用 LLM 生成专业的执行摘要"""
+        if not self.processor.llm_client.is_available:
+            return "（由于 LLM 服务不可用，无法生成执行摘要）"
+
+        doc_name = analysis_data["document_info"]["name"]
+        risk = analysis_data["risk_analysis"]
+        entities_summary = ", ".join([f"{e['text']}({e['type']})" for e in risk["entities"][:10]])
+
+        prompt = f"""
+请为以下财务风险分析结果编写一段专业的执行摘要（Executive Summary）。
+文档名称：{doc_name}
+风险等级：{risk['risk_level']}
+量化总分：{risk['total_risk_score']}
+识别出的关键实体：{entities_summary}
+
+要求：
+1. 语言专业、简练，符合金融风控报告风格。
+2. 重点突出核心风险点。
+3. 字数控制在 200 字以内。
+"""
+        try:
+            summary = self.processor.llm_client.chat(
+                [{"role": "user", "content": prompt}], temperature=0.3
+            )
+            return summary.strip()
+        except Exception as e:
+            logger.error(f"Failed to generate executive summary: {e}")
+            return "（执行摘要生成失败）"
 
     def generate_report(
-        self, analysis_data: Dict[str, Any], output_path: Optional[Path] = None
+        self,
+        analysis_data: Dict[str, Any],
+        output_path: Optional[Path] = None,
+        include_summary: bool = True,
     ) -> str:
         """根据分析数据生成 Markdown 格式的风险报告"""
         doc_info = analysis_data["document_info"]
         classification = analysis_data["classification"]
         risk = analysis_data["risk_analysis"]
 
+        # 生成执行摘要
+        executive_summary = ""
+        if include_summary:
+            executive_summary = f"## 0. 执行摘要\n{self._generate_executive_summary(analysis_data)}\n\n"
+
         report = f"""# 财务风险分析报告: {doc_info['name']}
 
-## 1. 基本信息
+{executive_summary}## 1. 基本信息
 - **分析时间**: {doc_info['analyzed_at']}
 - **文档类型**: {classification.get('type', '未知')} (置信度: {classification.get('confidence', 0.0):.2f})
 - **分类依据**: {classification.get('reason', '无')}
@@ -141,7 +180,7 @@ class RiskAnalysisService:
 
         return report
 
-    def process_batch(self, directory: Path) -> List[Dict[str, Any]]:
+    def process_batch(self, directory: Path) -> Dict[str, Any]:
         """批量处理目录下的所有 PDF"""
         results = []
         for pdf in directory.glob("*.pdf"):
@@ -149,7 +188,12 @@ class RiskAnalysisService:
                 results.append(self.analyze_document(pdf))
             except Exception as exc:
                 logger.error("Failed to analyze %s: %s", pdf.name, exc)
-        return results
+
+        return {
+            "status": "success",
+            "results": results,
+            "count": len(results),
+        }
 
     def query_risk(self, question: str):
         """执行 RAG 风险问答"""

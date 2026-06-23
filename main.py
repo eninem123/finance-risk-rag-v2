@@ -62,8 +62,8 @@ def main():
             return
 
         print(f"正在分析: {input_path}")
-        results = service.run_full_analysis(input_path)
-        count = len(results) if isinstance(results, dict) else 0
+        output = service.run_full_analysis(input_path)
+        count = output.get("count", 0)
         print(f"分析完成。处理了 {count} 个文件。")
 
     elif args.command == "extract":
@@ -99,12 +99,13 @@ def main():
             service.generate_report(analysis, report_path)
             print(f"✅ 报告已生成: {report_path}")
         else:
-            batch_results = service.process_batch(input_path)
-            for analysis in batch_results:
+            batch_output = service.process_batch(input_path)
+            results = batch_output.get("results", [])
+            for analysis in results:
                 name = analysis["document_info"]["name"]
                 report_path = output_dir / f"{Path(name).stem}_report.md"
                 service.generate_report(analysis, report_path)
-            print(f"✅ 批量报告已生成 {len(batch_results)} 份，目录: {output_dir}")
+            print(f"✅ 批量报告已生成 {len(results)} 份，目录: {output_dir}")
 
     elif args.command == "dashboard":
         import os
