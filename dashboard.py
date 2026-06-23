@@ -15,7 +15,7 @@ from src.finance_risk_rag.service import RiskAnalysisService  # noqa: E402
 from src.finance_risk_rag.utils import load_json_file  # noqa: E402
 
 st.set_page_config(
-    page_title="Finance-Risk-RAG v2.2 Dashboard",
+    page_title="Finance-Risk-RAG v2.3 Dashboard",
     page_icon="🏦",
     layout="wide",
 )
@@ -28,13 +28,13 @@ if "service" not in st.session_state:
 
 service = st.session_state.service
 
-st.sidebar.title("🏦 Finance-Risk-RAG v2.2")
+st.sidebar.title("🏦 Finance-Risk-RAG v2.3")
 st.sidebar.markdown("银行级多语言财务文本风控系统")
 st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "功能菜单",
-    ["数据总览", "文档分析", "风险检索"],
+    ["数据总览", "文档分析", "风险报告", "风险检索"],
 )
 
 if page == "数据总览":
@@ -54,8 +54,11 @@ if page == "数据总览":
                 st.bar_chart(type_counts)
 
             with col2:
-                st.subheader("处理详情")
-                st.dataframe(df[["type", "confidence"]], use_container_width=True)
+                st.subheader("置信度分布")
+                st.line_chart(df["confidence"])
+
+            st.subheader("详细数据")
+            st.dataframe(df, use_container_width=True)
         else:
             st.info("暂无处理数据。")
     else:
@@ -84,8 +87,38 @@ elif page == "文档分析":
                 if result.entities:
                     entities_df = pd.DataFrame([e.to_dict() for e in result.entities])
                     st.dataframe(entities_df, use_container_width=True)
+
+                    # 风险类型分布
+                    st.subheader("风险类型分布")
+                    risk_counts = entities_df["type"].value_counts()
+                    st.bar_chart(risk_counts)
                 else:
                     st.success("未检测到显著风险实体。")
+
+elif page == "风险报告":
+    st.title("📋 风险分析报告")
+
+    pdf_files = list(config.docs_dir.glob("*.pdf"))
+    if not pdf_files:
+        st.warning("请先上传 PDF 文档。")
+    else:
+        selected_pdf = st.selectbox("选择要分析的 PDF", [f.name for f in pdf_files])
+        pdf_path = config.docs_dir / selected_pdf
+
+        if st.button("生成综合报告"):
+            with st.spinner("正在生成深度分析报告..."):
+                analysis = service.analyze_document(pdf_path)
+                report_md = service.generate_report(analysis)
+
+                st.markdown("---")
+                st.markdown(report_md)
+
+                st.download_button(
+                    label="下载报告 (Markdown)",
+                    data=report_md,
+                    file_name=f"{Path(selected_pdf).stem}_risk_report.md",
+                    mime="text/markdown",
+                )
 
 elif page == "风险检索":
     st.title("🔍 风险检索 (RAG)")

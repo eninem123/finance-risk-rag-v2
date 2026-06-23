@@ -109,30 +109,66 @@ class BERTExtractor:
             logger.warning(f"Failed to load BERT model: {e}")
             self.model = None
 
+    @property
     def is_available(self) -> bool:
         return self.model is not None
 
+    def _chunk_text(
+        self, text: str, max_chars: int = 1000, overlap: int = 200
+    ) -> List[Tuple[str, int]]:
+        """将文本切分为带重叠的字符块，返回 (块文本, 起始偏移量) 列表"""
+        chunks = []
+        if not text:
+            return chunks
+
+        start = 0
+        text_len = len(text)
+        while start < text_len:
+            end = min(start + max_chars, text_len)
+            chunks.append((text[start:end], start))
+            if end == text_len:
+                break
+            start += max_chars - overlap
+        return chunks
+
     def extract(self, text: str) -> List[Entity]:
-        if not self.is_available() or not text:
+        if not self.is_available or not text:
             return []
 
         try:
-            results = self.nlp(text)
-            entities = []
-            for res in results:
-                entities.append(
-                    Entity(
-                        type=res["entity_group"],
-                        text=res["word"],
-                        risk_score=20,  # Default risk score for BERT entities
-                        confidence=float(res["score"]),
-                        context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
-                        source="bert",
-                        start_char=res["start"],
-                        end_char=res["end"],
+            # 对于长文本，使用滑动窗口切分
+            chunks = self._chunk_text(text)
+            all_entities = []
+            seen_keys = set()
+
+            for chunk_text, offset in chunks:
+                results = self.nlp(chunk_text)
+                for res in results:
+                    # 转换偏移量回全局坐标
+                    global_start = res["start"] + offset
+                    global_end = res["end"] + offset
+
+                    # 使用 (类型, 文本, 开始位置) 作为唯一键进行去重
+                    key = (res["entity_group"], res["word"], global_start)
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+
+                    all_entities.append(
+                        Entity(
+                            type=res["entity_group"],
+                            text=res["word"],
+                            risk_score=20,
+                            confidence=float(res["score"]),
+                            context=text[
+                                max(0, global_start - 40) : min(len(text), global_end + 40)
+                            ],
+                            source="bert",
+                            start_char=global_start,
+                            end_char=global_end,
+                        )
                     )
-                )
-            return entities
+            return all_entities
         except Exception as e:
             logger.error(f"BERT extraction failed: {e}")
             return []
@@ -172,25 +208,34 @@ class EntityExtractionPipeline:
     ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理重叠。
-        优先考虑高分和高置信度的实体。
+        仲裁逻辑：
+        1. 优先考虑高置信度 (score > 0.85) 的 BERT 实体
+        2. 其次按风险分数排序
+        3. 最后按置信度和长度排序
         """
         all_entities = rule_entities + bert_entities
         if not all_entities:
             return []
 
-        # 按得分和置信度排序
-        all_entities.sort(key=lambda x: (x.risk_score, x.confidence), reverse=True)
+        # 排序权重
+        def arbitration_score(e: Entity):
+            # 优先高置信度 BERT 实体
+            bert_bonus = 1000 if (e.source == "bert" and e.confidence > 0.85) else 0
+            return (bert_bonus, e.risk_score, e.confidence, len(e.text))
+
+        all_entities.sort(key=arbitration_score, reverse=True)
 
         final_entities: List[Entity] = []
 
         for current in all_entities:
             is_redundant = False
             for existing in final_entities:
-                # 使用字符偏移量进行精确的重叠检测
-                overlap = max(current.start_char, existing.start_char) < min(
-                    current.end_char, existing.end_char
+                # 精确字符重叠检测
+                overlap_len = min(current.end_char, existing.end_char) - max(
+                    current.start_char, existing.start_char
                 )
-                if overlap:
+                if overlap_len > 0:
+                    # 如果重叠，由于已排序，当前实体被视为冗余
                     is_redundant = True
                     break
 
