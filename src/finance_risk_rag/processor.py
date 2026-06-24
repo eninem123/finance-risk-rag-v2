@@ -89,21 +89,28 @@ class DocumentProcessor:
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 for i, page in enumerate(pdf.pages):
-                    page_text = page.extract_text()
-                    if page_text and len(page_text.strip()) > 50:
-                        text += f"\n--- Page {i+1} (Text) ---\n{page_text}"
-                    else:
-                        img = page.to_image(resolution=self.config.ocr_dpi).original
-                        img = self.optimize_image_for_ocr(img)
-                        ocr_text = pytesseract.image_to_string(
-                            img, lang=self.config.ocr_languages, config="--oem 1 --psm 3"
-                        )
-                        text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
-                        ocr_pages += 1
+                    try:
+                        page_text = page.extract_text()
+                        if page_text and len(page_text.strip()) > 50:
+                            text += f"\n--- Page {i+1} (Text) ---\n{page_text}"
+                        else:
+                            img = page.to_image(resolution=self.config.ocr_dpi).original
+                            img = self.optimize_image_for_ocr(img)
+                            ocr_text = pytesseract.image_to_string(
+                                img, lang=self.config.ocr_languages, config="--oem 1 --psm 3"
+                            )
+                            text += f"\n--- Page {i+1} (OCR) ---\n{ocr_text}"
+                            ocr_pages += 1
+                    except pytesseract.TesseractError as te:
+                        logger.error(f"Tesseract error on page {i+1} of {pdf_path.name}: {te}")
+                        text += f"\n--- Page {i+1} (OCR Error) ---\n[OCR Failed: {te}]"
+                    except Exception as pe:
+                        logger.error(f"Error on page {i+1} of {pdf_path.name}: {pe}")
+                        text += f"\n--- Page {i+1} (Error) ---\n[Page Processing Failed: {pe}]"
             return text, ocr_pages
         except Exception as e:
-            logger.error(f"Error processing {pdf_path}: {e}")
-            raise OCRError(f"PDF extraction failed for {pdf_path}: {e}")
+            logger.error(f"Critical error processing {pdf_path}: {e}")
+            raise OCRError(f"Critical PDF extraction failed for {pdf_path}: {e}")
 
     def process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
         """处理单个 PDF 的方法，支持并行化"""

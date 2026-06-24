@@ -35,6 +35,14 @@ class RuleBasedExtractor:
             raise ExtractionError(f"Failed to load rules: {e}")
 
     def extract(self, text: str) -> List[Entity]:
+        """使用专家规则从文本中提取实体。
+
+        Args:
+            text: 输入文本。
+
+        Returns:
+            发现的实体列表。
+        """
         if not text or not self.rules:
             return []
 
@@ -88,11 +96,7 @@ class BERTExtractor:
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import (
-                AutoModelForTokenClassification,
-                AutoTokenizer,
-                pipeline,
-            )
+            from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
@@ -113,6 +117,14 @@ class BERTExtractor:
         return self.model is not None
 
     def extract(self, text: str) -> List[Entity]:
+        """使用 BERT 模型从文本中提取风险实体。
+
+        Args:
+            text: 输入文本。
+
+        Returns:
+            BERT 识别的实体列表。
+        """
         if not self.is_available() or not text:
             return []
 
@@ -172,14 +184,38 @@ class EntityExtractionPipeline:
     ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理重叠。
-        优先考虑高分和高置信度的实体。
+
+        仲裁策略：
+        1. 优先考虑 BERT 实体，如果其置信度 > 0.85（AI 确定性高）。
+        2. 否则，按得分和置信度排序。
         """
-        all_entities = rule_entities + bert_entities
-        if not all_entities:
+        if not rule_entities and not bert_entities:
             return []
 
-        # 按得分和置信度排序
-        all_entities.sort(key=lambda x: (x.risk_score, x.confidence), reverse=True)
+        # 给 BERT 高置信度实体额外的权重，以便在排序时胜出
+        # 或者直接在合并时处理
+        all_entities = []
+
+        # 处理 BERT 实体
+        for be in bert_entities:
+            all_entities.append(be)
+
+        # 处理规则实体
+        for rule_e in rule_entities:
+            all_entities.append(rule_e)
+
+        # 排序：
+        # 1. BERT 置信度 > 0.85 的优先 (通过元组排序实现)
+        # 2. 风险分数
+        # 3. 置信度
+        all_entities.sort(
+            key=lambda x: (
+                x.source == "bert" and x.confidence > 0.85,
+                x.risk_score,
+                x.confidence,
+            ),
+            reverse=True,
+        )
 
         final_entities: List[Entity] = []
 
