@@ -8,12 +8,11 @@ Finance-Risk-RAG 风险分析服务层
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from .config import Config, get_config
 from .engine import RAGEngine
 from .extractor import EntityExtractionPipeline
-from .models import ExtractionResult
 from .processor import DocumentProcessor
 from .utils import save_json_file
 
@@ -32,9 +31,30 @@ class RiskAnalysisService:
         extractor: Optional[EntityExtractionPipeline] = None,
     ):
         self.config = config or get_config()
-        self.processor = processor or DocumentProcessor(self.config)
-        self.pipeline = pipeline or extractor or EntityExtractionPipeline(self.config)
-        self.engine = engine or RAGEngine(self.config)
+        self._processor = processor
+        self._pipeline = pipeline or extractor
+        self._engine = engine
+
+    @property
+    def processor(self) -> DocumentProcessor:
+        """延迟初始化文档处理器"""
+        if self._processor is None:
+            self._processor = DocumentProcessor(self.config)
+        return self._processor
+
+    @property
+    def pipeline(self) -> EntityExtractionPipeline:
+        """延迟初始化实体提取管道"""
+        if self._pipeline is None:
+            self._pipeline = EntityExtractionPipeline(self.config)
+        return self._pipeline
+
+    @property
+    def engine(self) -> RAGEngine:
+        """延迟初始化 RAG 引擎"""
+        if self._engine is None:
+            self._engine = RAGEngine(self.config)
+        return self._engine
 
     @property
     def extractor(self) -> EntityExtractionPipeline:
@@ -42,7 +62,14 @@ class RiskAnalysisService:
         return self.pipeline
 
     def analyze_document(self, pdf_path: Path) -> Dict[str, Any]:
-        """执行单文档完整分析：OCR -> 分类 -> 实体提取"""
+        """执行单文档完整分析：OCR -> 分类 -> 实体提取。
+
+        Args:
+            pdf_path: PDF 文件的路径。
+
+        Returns:
+            包含文档信息、分类结果和风险分析的字典。
+        """
         logger.info("Starting full analysis for %s", pdf_path.name)
 
         proc_result = self.processor.process_single_pdf(pdf_path)
@@ -59,12 +86,16 @@ class RiskAnalysisService:
             "risk_analysis": extraction_result.to_dict(),
         }
 
-    def run_full_analysis(
-        self, input_path: Path
-    ) -> Union[Dict[str, ExtractionResult], Dict[str, Any]]:
-        """
-        执行全流程分析：OCR -> 文档分类 -> 实体提取 -> RAG 索引构建。
-        单 PDF 返回详细分析字典，目录返回文件名到提取结果的映射。
+    def run_full_analysis(self, input_path: Path) -> Dict[str, Any]:
+        """执行全流程分析：OCR -> 文档分类 -> 实体提取 -> RAG 索引构建。
+
+        始终返回包含状态、结果和计数的标准字典。
+
+        Args:
+            input_path: PDF 文件或包含 PDF 的目录路径。
+
+        Returns:
+            标准化结果字典，例如：{"status": "success", "results": [...], "count": 1}。
         """
         if input_path.is_file() and input_path.suffix.lower() == ".pdf":
             analysis_data = self.analyze_document(input_path)
@@ -73,22 +104,37 @@ class RiskAnalysisService:
             if txt_path.exists():
                 self.engine.add_documents([txt_path])
 
-            return analysis_data
+            return {"status": "success", "results": [analysis_data], "count": 1}
 
-        results: Dict[str, ExtractionResult] = {}
-
+        results_list = []
         if input_path.is_dir():
             self.processor.process_directory(input_path)
             txt_files = list(input_path.glob("*.txt"))
             for txt_file in txt_files:
                 if txt_file.name == "all_extracted.txt":
                     continue
-                extraction_res = self.pipeline.process(txt_file)
-                results[txt_file.stem + ".pdf"] = extraction_res
+
+                # 为了保持 run_full_analysis 的一致性，我们在这里重新组装分析数据
+                # 或者调用 analyze_document（如果 PDF 存在）
+                pdf_path = txt_file.with_suffix(".pdf")
+                if pdf_path.exists():
+                    try:
+                        results_list.append(self.analyze_document(pdf_path))
+                    except Exception as e:
+                        logger.error(f"Error analyzing {pdf_path}: {e}")
+                else:
+                    # 如果只有 txt，则仅做提取
+                    extraction_res = self.pipeline.process(txt_file)
+                    results_list.append(
+                        {
+                            "document_info": {"name": txt_file.name, "path": str(txt_file)},
+                            "risk_analysis": extraction_res.to_dict(),
+                        }
+                    )
 
             self.engine.build_index()
 
-        return results
+        return {"status": "success", "results": results_list, "count": len(results_list)}
 
     def generate_report(
         self, analysis_data: Dict[str, Any], output_path: Optional[Path] = None
@@ -127,8 +173,7 @@ class RiskAnalysisService:
             )
         elif risk["risk_level"] == "中风险":
             report += (
-                "💡 **建议**: 存在一定风险点，建议关注相关实体的背景情况，"
-                "必要时要求补充资料。\n"
+                "💡 **建议**: 存在一定风险点，建议关注相关实体的背景情况，" "必要时要求补充资料。\n"
             )
         else:
             report += "✅ **建议**: 风险较低，可按正常流程处理。\n"
