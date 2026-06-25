@@ -80,7 +80,7 @@ def main():
     elif args.command == "query":
         if args.build:
             print("正在构建索引...")
-            service.engine.build_index()
+            service.build_index()
 
         result = service.query_risk(args.question)
         print(f"\n回答: {result.answer}")
@@ -99,12 +99,8 @@ def main():
             service.generate_report(analysis, report_path)
             print(f"✅ 报告已生成: {report_path}")
         else:
-            batch_results = service.process_batch(input_path)
-            for analysis in batch_results:
-                name = analysis["document_info"]["name"]
-                report_path = output_dir / f"{Path(name).stem}_report.md"
-                service.generate_report(analysis, report_path)
-            print(f"✅ 批量报告已生成 {len(batch_results)} 份，目录: {output_dir}")
+            reports = service.generate_batch_reports(input_path, output_dir)
+            print(f"✅ 批量报告已生成 {len(reports)} 份，目录: {output_dir}")
 
     elif args.command == "dashboard":
         import os

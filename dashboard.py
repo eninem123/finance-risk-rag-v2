@@ -15,7 +15,7 @@ from src.finance_risk_rag.service import RiskAnalysisService  # noqa: E402
 from src.finance_risk_rag.utils import load_json_file  # noqa: E402
 
 st.set_page_config(
-    page_title="Finance-Risk-RAG v2.2 Dashboard",
+    page_title="Finance-Risk-RAG v2.3 Dashboard",
     page_icon="🏦",
     layout="wide",
 )
@@ -28,7 +28,7 @@ if "service" not in st.session_state:
 
 service = st.session_state.service
 
-st.sidebar.title("🏦 Finance-Risk-RAG v2.2")
+st.sidebar.title("🏦 Finance-Risk-RAG v2.3")
 st.sidebar.markdown("银行级多语言财务文本风控系统")
 st.sidebar.markdown("---")
 

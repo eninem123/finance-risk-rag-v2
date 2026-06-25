@@ -21,7 +21,13 @@ class TestRiskAnalysisService(unittest.TestCase):
 
     def test_run_full_analysis(self):
         # 准备 Mock 返回值
-        mock_pdf = Path("test.pdf")
+        mock_pdf = MagicMock(spec=Path)
+        mock_pdf.is_file.return_value = True
+        mock_pdf.suffix.lower.return_value = ".pdf"
+        mock_pdf.name = "test.pdf"
+        mock_pdf.with_suffix.return_value = MagicMock(spec=Path)
+        mock_pdf.with_suffix.return_value.exists.return_value = False
+
         self.mock_processor.process_single_pdf.return_value = {
             "text": "sample text",
             "classification": {"type": "审计报告", "confidence": 0.9, "reason": "test"},
