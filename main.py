@@ -63,7 +63,10 @@ def main():
 
         print(f"正在分析: {input_path}")
         results = service.run_full_analysis(input_path)
-        count = len(results) if isinstance(results, dict) else 0
+        if input_path.is_file():
+            count = 1 if results else 0
+        else:
+            count = len(results) if isinstance(results, dict) else 0
         print(f"分析完成。处理了 {count} 个文件。")
 
     elif args.command == "extract":

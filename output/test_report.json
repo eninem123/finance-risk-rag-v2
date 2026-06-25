@@ -1,0 +1,16 @@
+{
+  "document_info": {
+    "name": "test.pdf",
+    "analyzed_at": "now"
+  },
+  "classification": {
+    "type": "A",
+    "confidence": 0.9
+  },
+  "risk_analysis": {
+    "risk_level": "Low",
+    "total_risk_score": 0,
+    "entities": [],
+    "total_entities": 0
+  }
+}
