@@ -36,13 +36,16 @@ class RAGEngine:
 
     def _initialize_db(self):
         try:
+            logger.info(f"Initializing ChromaDB at {self._db_path}")
             self._client = chromadb.PersistentClient(path=str(self._db_path))
             # Use ONNX as default embedding function
             self._emb_fn = ef.ONNXMiniLM_L6_V2(preferred_providers=["CPUExecutionProvider"])
             self._collection = self._client.get_or_create_collection(
                 name="finance_docs", embedding_function=self._emb_fn
             )
+            logger.info("ChromaDB collection 'finance_docs' ready")
         except Exception as e:
+            logger.error(f"Failed to initialize ChromaDB: {e}")
             raise DatabaseError(f"Failed to initialize ChromaDB: {e}")
 
     def add_documents(self, txt_files: List[Path], force: bool = False):
@@ -106,8 +109,18 @@ class RAGEngine:
             raise RAGError(f"Query failed: {e}")
 
     def build_index(self):
+        """
+        Build index from all text files in the documents directory.
+        """
         docs_dir = self.config.docs_dir
+        logger.info(f"Building RAG index from {docs_dir}")
         txt_files = list(docs_dir.glob("*.txt"))
         # Exclude aggregate files
         txt_files = [f for f in txt_files if f.name not in ["all_extracted.txt"]]
+
+        if not txt_files:
+            logger.warning(f"No text files found in {docs_dir} to index.")
+            return
+
         self.add_documents(txt_files)
+        logger.info(f"RAG index build complete for {len(txt_files)} files.")

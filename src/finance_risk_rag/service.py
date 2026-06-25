@@ -31,15 +31,41 @@ class RiskAnalysisService:
         engine: Optional[RAGEngine] = None,
         extractor: Optional[EntityExtractionPipeline] = None,
     ):
+        """
+        初始化风险分析服务。
+
+        采用延迟加载（Lazy Initialization）模式，避免在不需要时初始化重型组件。
+        """
         self.config = config or get_config()
-        self.processor = processor or DocumentProcessor(self.config)
-        self.pipeline = pipeline or extractor or EntityExtractionPipeline(self.config)
-        self.engine = engine or RAGEngine(self.config)
+        self._processor = processor
+        self._pipeline = pipeline or extractor
+        self._engine = engine
+
+    @property
+    def processor(self) -> DocumentProcessor:
+        """获取文档处理器"""
+        if self._processor is None:
+            self._processor = DocumentProcessor(self.config)
+        return self._processor
+
+    @property
+    def pipeline(self) -> EntityExtractionPipeline:
+        """获取实体提取管道"""
+        if self._pipeline is None:
+            self._pipeline = EntityExtractionPipeline(self.config)
+        return self._pipeline
 
     @property
     def extractor(self) -> EntityExtractionPipeline:
-        """兼容旧版 API"""
+        """兼容旧版 API，等同于 pipeline"""
         return self.pipeline
+
+    @property
+    def engine(self) -> RAGEngine:
+        """获取 RAG 引擎"""
+        if self._engine is None:
+            self._engine = RAGEngine(self.config)
+        return self._engine
 
     def analyze_document(self, pdf_path: Path) -> Dict[str, Any]:
         """执行单文档完整分析：OCR -> 分类 -> 实体提取"""
@@ -78,6 +104,7 @@ class RiskAnalysisService:
         results: Dict[str, ExtractionResult] = {}
 
         if input_path.is_dir():
+            logger.info("Starting batch processing for directory: %s", input_path)
             self.processor.process_directory(input_path)
             txt_files = list(input_path.glob("*.txt"))
             for txt_file in txt_files:
@@ -87,8 +114,25 @@ class RiskAnalysisService:
                 results[txt_file.stem + ".pdf"] = extraction_res
 
             self.engine.build_index()
+            logger.info("Batch processing complete. Analyzed %d documents.", len(results))
 
         return results
+
+    def build_index(self):
+        """构建 RAG 索引"""
+        self.engine.build_index()
+
+    def generate_batch_reports(self, input_dir: Path, output_dir: Path) -> List[str]:
+        """批量生成风险报告"""
+        output_dir.mkdir(parents=True, exist_ok=True)
+        batch_results = self.process_batch(input_dir)
+        report_paths = []
+        for analysis in batch_results:
+            name = analysis["document_info"]["name"]
+            report_path = output_dir / f"{Path(name).stem}_report.md"
+            self.generate_report(analysis, report_path)
+            report_paths.append(str(report_path))
+        return report_paths
 
     def generate_report(
         self, analysis_data: Dict[str, Any], output_path: Optional[Path] = None
@@ -127,8 +171,7 @@ class RiskAnalysisService:
             )
         elif risk["risk_level"] == "中风险":
             report += (
-                "💡 **建议**: 存在一定风险点，建议关注相关实体的背景情况，"
-                "必要时要求补充资料。\n"
+                "💡 **建议**: 存在一定风险点，建议关注相关实体的背景情况，" "必要时要求补充资料。\n"
             )
         else:
             report += "✅ **建议**: 风险较低，可按正常流程处理。\n"

@@ -58,7 +58,9 @@ class LLMClientWrapper:
         发送聊天请求，带有指数退避重试机制。
         """
         if not self.is_available:
-            raise LLMError("LLM client not initialized.")
+            if not self.api_key:
+                raise LLMError("LLM API key is missing. Please check your configuration.")
+            raise LLMError("LLM client not initialized for unknown reasons.")
 
         retries = 0
         while retries <= max_retries:
