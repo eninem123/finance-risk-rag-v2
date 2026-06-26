@@ -2,50 +2,55 @@
 Finance-Risk-RAG 配置模块
 ========================
 
-集中管理系统配置参数，支持环境变量覆盖。
+集中管理系统配置参数，使用 Pydantic 进行验证和环境变量管理。
 """
 
 import os
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from pydantic import Field, computed_field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-@dataclass
-class Config:
+
+class Config(BaseSettings):
     """
-    系统配置类
+    系统配置类，支持从环境变量加载。
     """
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     # ==================== 路径配置 ====================
 
-    # 项目根目录
-    base_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
+    # 项目根目录 (默认为 src 的上级目录)
+    base_dir: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
 
     # BERT本地模型路径
     bert_local_path: Optional[Path] = None
 
     # Chroma向量数据库路径
-    chroma_db_dir: Path = field(default_factory=lambda: Path("rag_db"))
+    chroma_db_dir: Path = Field(default=Path("rag_db"))
 
     # 缓存目录
-    cache_dir: Path = field(default_factory=lambda: Path("cache"))
+    cache_dir: Path = Field(default=Path("cache"))
 
     # 日志目录
-    log_dir: Path = field(default_factory=lambda: Path("logs"))
+    log_dir: Path = Field(default=Path("logs"))
 
-    # 文署目录
-    docs_dir: Path = field(default_factory=lambda: Path("docs"))
+    # 文档目录
+    docs_dir: Path = Field(default=Path("docs"))
 
     # 知识库目录
-    knowledge_base_dir: Path = field(default_factory=lambda: Path("knowledge_base"))
+    knowledge_base_dir: Path = Field(default=Path("knowledge_base"))
 
     # ==================== LLM 配置 ====================
 
-    llm_provider: str = "moonshot"
-    llm_api_key: Optional[str] = None
-    llm_base_url: str = "https://api.moonshot.cn/v1"
-    llm_model_name: str = "moonshot-v1-8k"
+    llm_provider: str = Field(default="moonshot", validation_alias="LLM_PROVIDER")
+    llm_api_key: Optional[str] = Field(default=None, validation_alias="MOONSHOT_API_KEY")
+    llm_base_url: str = Field(default="https://api.moonshot.cn/v1", validation_alias="LLM_BASE_URL")
+    llm_model_name: str = Field(default="moonshot-v1-8k", validation_alias="LLM_MODEL_NAME")
     max_context_tokens: int = 2000
 
     # ==================== 嵌入模型配置 ====================
@@ -54,7 +59,9 @@ class Config:
 
     # ==================== OCR 配置 ====================
 
-    tesseract_cmd: Optional[str] = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    tesseract_cmd: Optional[str] = Field(
+        default=r"C:\Program Files\Tesseract-OCR\tesseract.exe", validation_alias="TESSERACT_CMD"
+    )
     ocr_languages: str = "chi_tra+chi_sim+eng"
     ocr_dpi: int = 600
     ocr_version: str = "v7"
@@ -67,25 +74,14 @@ class Config:
 
     # ==================== 处理配置 ====================
 
-    chunk_size: int = 800
-    chunk_overlap: int = 100
+    chunk_size: int = Field(default=800, validation_alias="CHUNK_SIZE")
+    chunk_overlap: int = Field(default=100, validation_alias="CHUNK_OVERLAP")
     batch_size: int = 100
 
-    def __post_init__(self) -> None:
-        """从环境变量加载配置并解析路径"""
-        self._load_from_env()
+    def model_post_init(self, __context) -> None:
+        """解析路径并确保目录存在"""
         self._resolve_paths()
-
-    def _load_from_env(self) -> None:
-        self.llm_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("MOONSHOT_API_KEY")
-        self.llm_provider = os.getenv("LLM_PROVIDER", self.llm_provider)
-        self.llm_base_url = os.getenv("LLM_BASE_URL", self.llm_base_url)
-        self.llm_model_name = os.getenv("LLM_MODEL_NAME", self.llm_model_name)
-
-        self.tesseract_cmd = os.getenv("TESSERACT_CMD", self.tesseract_cmd)
-
-        self.chunk_size = int(os.getenv("CHUNK_SIZE", self.chunk_size))
-        self.chunk_overlap = int(os.getenv("CHUNK_OVERLAP", self.chunk_overlap))
+        # 注意：不再自动调用 ensure_directories，改为按需调用
 
     def _resolve_paths(self) -> None:
         # 将相对路径转换为绝对路径
@@ -99,18 +95,22 @@ class Config:
         if bert_path.exists():
             self.bert_local_path = bert_path
 
+    @computed_field
     @property
     def risk_entities_path(self) -> Path:
         return self.knowledge_base_dir / "risk_entities.json"
 
+    @computed_field
     @property
     def stopwords_path(self) -> Path:
         return self.knowledge_base_dir / "stopwords.txt"
 
+    @computed_field
     @property
     def finance_dict_path(self) -> Path:
         return self.knowledge_base_dir / "finance_dict.txt"
 
+    @computed_field
     @property
     def processing_log_path(self) -> Path:
         return self.cache_dir / "processing_log.json"

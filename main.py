@@ -7,19 +7,22 @@ import argparse
 import sys
 from pathlib import Path
 
+from pydantic import ValidationError
+
 # Standardize sys.path
 src_path = Path(__file__).parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 from src.finance_risk_rag.config import get_config  # noqa: E402
+from src.finance_risk_rag.exceptions import FinanceRiskRAGError  # noqa: E402
 from src.finance_risk_rag.service import RiskAnalysisService  # noqa: E402
 from src.finance_risk_rag.utils import save_json_file, setup_logger  # noqa: E402
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Finance-Risk-RAG: 银行级财务文本风控 AI 系统 (v2.2)",
+        description="Finance-Risk-RAG: 银行级财务文本风控 AI 系统 (v2.3)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command", help="子命令")
@@ -50,69 +53,80 @@ def main():
     subparsers.add_parser("dashboard", help="启动 Streamlit 可视化面板")
 
     args = parser.parse_args()
-    config = get_config()
-    setup_logger("finance_risk_rag")
 
-    service = RiskAnalysisService(config)
+    try:
+        config = get_config()
+        setup_logger("finance_risk_rag")
+        service = RiskAnalysisService(config)
 
-    if args.command == "process":
-        input_path = Path(args.input) if args.input else config.docs_dir
-        if not input_path.exists():
-            print(f"错误: 路径不存在 - {input_path}")
-            return
+        if args.command == "process":
+            input_path = Path(args.input) if args.input else config.docs_dir
+            if not input_path.exists():
+                print(f"错误: 路径不存在 - {input_path}")
+                return
 
-        print(f"正在分析: {input_path}")
-        results = service.run_full_analysis(input_path)
-        count = len(results) if isinstance(results, dict) else 0
-        print(f"分析完成。处理了 {count} 个文件。")
+            print(f"正在分析: {input_path}")
+            results = service.run_full_analysis(input_path)
+            count = len(results) if isinstance(results, dict) else 0
+            print(f"分析完成。处理了 {count} 个文件。")
 
-    elif args.command == "extract":
-        input_path = Path(args.input)
-        if not input_path.exists():
-            print(f"错误: 文件不存在 - {input_path}")
-            return
+        elif args.command == "extract":
+            input_path = Path(args.input)
+            if not input_path.exists():
+                print(f"错误: 文件不存在 - {input_path}")
+                return
 
-        result = service.pipeline.process(input_path)
-        save_json_file(result.to_dict(), Path(args.output))
-        print(f"✅ 实体提取完成。风险等级: {result.risk_level}, 总分: {result.total_risk_score}")
-        print(f"结果已保存至 {args.output}")
+            result = service.pipeline.process(input_path)
+            save_json_file(result.to_dict(), Path(args.output))
+            print(f"✅ 实体提取完成。风险等级: {result.risk_level}, 总分: {result.total_risk_score}")
+            print(f"结果已保存至 {args.output}")
 
-    elif args.command == "query":
-        if args.build:
-            print("正在构建索引...")
-            service.engine.build_index()
+        elif args.command == "query":
+            if args.build:
+                print("正在构建索引...")
+                service.engine.build_index()
 
-        result = service.query_risk(args.question)
-        print(f"\n回答: {result.answer}")
-        print(f"\n来源: {result.sources}")
+            result = service.query_risk(args.question)
+            print(f"\n回答: {result.answer}")
+            print(f"\n来源: {result.sources}")
 
-    elif args.command == "report":
-        input_path = Path(args.input)
-        output_dir = Path(args.output_dir)
-        if not input_path.exists():
-            print(f"错误: 路径不存在 - {input_path}")
-            return
+        elif args.command == "report":
+            input_path = Path(args.input)
+            output_dir = Path(args.output_dir)
+            if not input_path.exists():
+                print(f"错误: 路径不存在 - {input_path}")
+                return
 
-        if input_path.is_file():
-            analysis = service.analyze_document(input_path)
-            report_path = output_dir / f"{input_path.stem}_report.md"
-            service.generate_report(analysis, report_path)
-            print(f"✅ 报告已生成: {report_path}")
-        else:
-            batch_results = service.process_batch(input_path)
-            for analysis in batch_results:
-                name = analysis["document_info"]["name"]
-                report_path = output_dir / f"{Path(name).stem}_report.md"
+            if input_path.is_file():
+                analysis = service.analyze_document(input_path)
+                report_path = output_dir / f"{input_path.stem}_report.md"
                 service.generate_report(analysis, report_path)
-            print(f"✅ 批量报告已生成 {len(batch_results)} 份，目录: {output_dir}")
+                print(f"✅ 报告已生成: {report_path}")
+            else:
+                batch_results = service.process_batch(input_path)
+                for analysis in batch_results:
+                    name = analysis["document_info"]["name"]
+                    report_path = output_dir / f"{Path(name).stem}_report.md"
+                    service.generate_report(analysis, report_path)
+                print(f"✅ 批量报告已生成 {len(batch_results)} 份，目录: {output_dir}")
 
-    elif args.command == "dashboard":
-        import os
+        elif args.command == "dashboard":
+            import os
 
-        os.system("streamlit run dashboard.py")
+            os.system("streamlit run dashboard.py")
 
-    else:
-        parser.print_help()
+        else:
+            parser.print_help()
+
+    except ValidationError as e:
+        print(f"配置验证错误: {e}")
+        sys.exit(1)
+    except FinanceRiskRAGError as e:
+        print(f"系统运行错误: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"发生未知错误: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

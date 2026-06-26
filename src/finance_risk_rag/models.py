@@ -2,16 +2,16 @@
 Finance-Risk-RAG 数据模型模块
 ============================
 
-定义系统中通用的数据类（Data Classes）。
+定义系统中通用的数据类，使用 Pydantic 进行验证。
 """
 
-from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+from pydantic import BaseModel, Field
 
 
-@dataclass
-class Entity:
+class Entity(BaseModel):
     """风险实体数据类"""
 
     type: str
@@ -22,21 +22,11 @@ class Entity:
     source: str = "rule"
     start_char: int = 0
     end_char: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            "type": self.type,
-            "text": self.text,
-            "risk_score": self.risk_score,
-            "confidence": round(self.confidence, 4),
-            "context": self.context,
-            "source": self.source,
-            "start_char": self.start_char,
-            "end_char": self.end_char,
-            **self.metadata,
-        }
+        """转换为字典（兼容旧版 API）"""
+        return self.model_dump()
 
     @property
     def key(self) -> Tuple[str, str, int]:
@@ -44,58 +34,49 @@ class Entity:
         return (self.type, self.text, self.start_char)
 
 
-@dataclass
-class ExtractionResult:
+class ExtractionResult(BaseModel):
     """提取结果数据类"""
 
     entities: List[Entity]
     total_risk_score: int
     risk_level: str
-    extraction_time: str = field(default_factory=lambda: datetime.now().isoformat())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    extraction_time: str = Field(default_factory=lambda: datetime.now().isoformat())
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            "extracted_at": self.extraction_time,
-            "total_entities": len(self.entities),
-            "total_risk_score": self.total_risk_score,
-            "risk_level": self.risk_level,
-            "entities": [e.to_dict() for e in self.entities],
-            **self.metadata,
-        }
+        """转换为字典（兼容旧版 API）"""
+        data = self.model_dump()
+        data["extracted_at"] = self.extraction_time
+        data["total_entities"] = len(self.entities)
+        return data
 
 
-@dataclass
-class ChunkConfig:
+class ChunkConfig(BaseModel):
     """文本分块配置"""
 
     chunk_size: int = 800
     overlap: int = 100
 
 
-@dataclass
-class DocumentChunk:
+class DocumentChunk(BaseModel):
     """文档分块数据类"""
 
     content: str
     source: str
     chunk_index: int
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
-@dataclass
-class QueryResult:
+class QueryResult(BaseModel):
     """查询结果数据类"""
 
     answer: str
     sources: List[Dict[str, Any]]
     confidence: float = 1.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
-@dataclass
-class ClassificationResult:
+class ClassificationResult(BaseModel):
     """文档分类结果"""
 
     type: str
@@ -103,4 +84,4 @@ class ClassificationResult:
     reason: str
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"type": self.type, "confidence": self.confidence, "reason": self.reason}
+        return self.model_dump()
