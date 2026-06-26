@@ -13,6 +13,7 @@ from src.finance_risk_rag.service import RiskAnalysisService
 class TestRiskAnalysisService(unittest.TestCase):
     def setUp(self):
         self.mock_config = MagicMock()
+        self.mock_config.llm_base_url = "http://localhost"
         self.mock_processor = MagicMock()
         self.mock_extractor = MagicMock()
         self.service = RiskAnalysisService(
@@ -21,7 +22,12 @@ class TestRiskAnalysisService(unittest.TestCase):
 
     def test_run_full_analysis(self):
         # 准备 Mock 返回值
-        mock_pdf = Path("test.pdf")
+        mock_pdf = MagicMock(spec=Path)
+        mock_pdf.is_file.return_value = True
+        mock_pdf.suffix = ".pdf"
+        mock_pdf.name = "test.pdf"
+        mock_pdf.__str__.return_value = "test.pdf"
+
         self.mock_processor.process_single_pdf.return_value = {
             "text": "sample text",
             "classification": {"type": "审计报告", "confidence": 0.9, "reason": "test"},
@@ -71,10 +77,10 @@ class TestRiskAnalysisService(unittest.TestCase):
         report = self.service.generate_report(analysis_data)
 
         # 断言
-        self.assertIn("# 财务风险分析报告: test.pdf", report)
+        self.assertIn("# 🏦 财务风险分析专业报告: test.pdf", report)
         self.assertIn("中风险", report)
         self.assertIn("bad debt", report)
-        self.assertIn("💡 **建议**", report)
+        self.assertIn("💡 5. 专家建议", report)
 
 
 if __name__ == "__main__":

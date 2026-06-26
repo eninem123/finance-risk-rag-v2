@@ -1,118 +1,82 @@
-# Finance-Risk-RAG v2.2
+# Finance-Risk-RAG v2.3
 
 <div align="center">
 
-**银行级多语言财务文本风控 AI 系统**
+**🏦 银行级多语言财务文本风控 AI 系统**
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-v2.2-blue?style=flat-square)]()
+[![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063?style=flat-square)](https://docs.pydantic.dev/)
+[![Version](https://img.shields.io/badge/Version-v2.3-blue?style=flat-square)]()
 
-OCR 智能识别 · BERT 实体提取 · RAG 风险问答 · Streamlit 可视化面板
+**战略级财务风险管控 · 高度可审计 · 企业级架构**
+
+[核心能力](#核心能力) | [技术架构](#技术架构) | [快速开始](#快速开始) | [企业部署](#企业部署)
 
 </div>
 
 ---
 
-## 项目简介
+## 💎 战略价值
 
-Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，整合 OCR、BERT 实体提取、规则引擎与 RAG 检索增强生成，支持批量 PDF 处理、风险实体识别与智能问答。
+在现代金融监管环境下，对海量非结构化财务文档（审计报告、财报、行业分析）进行高效、准确的风险识别是银行及金融机构的核心竞争力。**Finance-Risk-RAG** 旨在解决以下痛点：
 
-> 本仓库为**个人闲置测试项目**，代码已收敛至 `main` 主线 v2.2 稳定版。
+- **自动化合规审核**：大幅降低人工审阅成本，提升合规覆盖率。
+- **深层风险穿透**：通过 BERT 与规则引擎双重验证，识别隐藏在文字中的关联风险。
+- **辅助决策支持**：基于 RAG 的智能问答系统，为风控人员提供即时的决策参考。
 
----
+## 🚀 v2.3 核心升级
 
-## v2.2 核心能力
+- **Pydantic 架构迁移**：全系统配置与模型采用 Pydantic v2，实现严格的类型校验与秒级序列化。
+- **健壮性增强**：引入指数退避重试机制与领域级异常捕获处理。
+- **专业报告引擎**：生成具备“执行摘要”与“专家建议”的标准化风险分析报告。
+- **环境隔离**：支持完整的环境变量配置（`.env`），适配容器化部署需求。
 
-| 模块 | 说明 |
-|------|------|
-| `RiskAnalysisService` | 业务编排层，协调 OCR → 分类 → 提取 → RAG |
-| `dashboard.py` | Streamlit 交互式面板（数据总览 / 文档分析 / 风险检索） |
-| `main.py report` | 生成 Markdown + JSON 综合风险报告 |
-| BERT 长文本切片 | 滑动窗口 Overlap Chunking，支持长文档 |
-| 精准偏移定位 | Entity 模型含 `start_char` / `end_char` |
+## 🛠 技术架构
 
----
+系统采用模块化分层设计，确保各组件可独立扩展：
 
-## 快速开始
+1.  **数据接入层 (Processor)**：集成 `pdfplumber` 与 `pytesseract` OCR，支持复杂格式 PDF。
+2.  **风险引擎层 (Extractor)**：
+    - **Rule-based**: 针对特定金融敏感词的精准匹配。
+    - **BERT-based**: 利用预训练语言模型进行语义级实体识别。
+3.  **知识检索层 (RAG)**：基于 `ChromaDB` 向量数据库与 `ONNX` 嵌入模型，实现高效上下文检索。
+4.  **业务编排层 (Service)**：`RiskAnalysisService` 统一调度，实现端到端闭环。
 
+## 📦 快速开始
+
+### 1. 环境准备
 ```bash
 git clone https://github.com/eninem123/finance-risk-rag-v2.git
 cd finance-risk-rag-v2
 pip install -r requirements.txt
+```
 
-# 全流程处理
-python main.py process --input ./docs/
+### 2. 配置
+拷贝 `.env.example` 并配置您的 API Key：
+```bash
+cp .env.example .env
+# 编辑 .env 文件，填写 MOONSHOT_API_KEY 或 OPENAI_API_KEY
+```
 
-# RAG 问答
-python main.py query "这笔贷款有哪些风险点？"
+### 3. 运行分析
+```bash
+# 生成专业分析报告
+python main.py report --input ./docs/sample_audit.pdf
 
-# 生成风险报告
-python main.py report --input document.pdf --output-dir reports/
-
-# 启动可视化面板
+# 启动交互式 Dashboard
 python main.py dashboard
 ```
 
----
+## 🏗 企业部署建议
 
-## 项目结构
-
-```
-finance-risk-rag-v2/
-├── src/finance_risk_rag/
-│   ├── service.py          # 业务编排服务层 (v2.2)
-│   ├── extractor.py        # 实体提取管道
-│   ├── processor.py        # 文档 OCR 处理
-│   ├── engine.py           # RAG 引擎
-│   └── ...
-├── dashboard.py            # Streamlit 可视化面板
-├── main.py                 # 统一 CLI 入口
-├── tests/                  # 单元测试
-└── .github/workflows/      # CI（仅 PR → main 触发）
-```
+- **OCR 优化**：在生产环境中，建议将 `Tesseract` 替换为更高性能的云端 OCR API 或 PaddleOCR。
+- **向量数据库**：对于千万级数据，建议连接外部 `Milvus` 或 `Pinecone` 实例。
+- **安全性**：确保 API 密钥存储在受保护的环境变量中，避免硬编码。
 
 ---
 
-## 2026-06 仓库整理记录
+## 📜 许可证
+本项目采用 [MIT License](LICENSE)。
 
-### 合并 PR（#11–#17 → main）
-
-| PR | 分支 | 内容 |
-|----|------|------|
-| #11 | `feature/professional-v2.1-optimization-*` | v2.1 架构优化 |
-| #12 | `feature/enterprise-optimization-*` | 企业服务层 + 报告生成 |
-| #13 | `optimize-finance-risk-rag-v2.2-*` | v2.2 服务层重构 |
-| #14 | `feature/professional-refactoring-and-dashboard-*` | 服务层 + 仪表盘 |
-| #15 | `feature/v2.2-optimization-7723*` | v2.2 架构升级 |
-| #16 | `feature/optimize-architecture-v2.2-*` | 架构优化 + Dashboard |
-| #17 | `feature/v2.2-optimization-1572*` | v2.2 全面升级 |
-| #18 | `feature/professional-refactoring-and-dashboard-v2.2-*` | 已合并至 main（2026-06-20） |
-| #19 | `feature/professional-refactoring-and-dashboard-v2.2-*` | **当前唯一迭代入口（Draft PR）** |
-
-### 删除分支（8 个 feature 临时分支）
-
-- `feature/enterprise-optimization-5050392069136229718`
-- `feature/optimize-architecture-v2.2-18168074359074526671`
-- `feature/professional-refactoring-and-dashboard-4562812990206762378`
-- `feature/professional-refactoring-and-dashboard-v2.2-2030757817022327085`
-- `feature/professional-v2.1-optimization-5571732041245732993`
-- `feature/v2.2-optimization-15723274487901237107`
-- `feature/v2.2-optimization-7723375731582770803`
-- `optimize-finance-risk-rag-v2.2-647354061673373050`
-
-### CI 降噪变更
-
-- 移除 `push` 自动触发，**仅 `pull_request → main`** 时运行
-- 取消 Python 多版本矩阵与 lint / test 重复步骤
-- 简化为单版本基础编译校验（`py_compile` + `compileall`）
-
-### Bot 降噪变更
-
-- 新增 `.cursor/rules/bot-noise-reduction.mdc`：禁止自动 PR 评论与 CI 告警回复，仅响应手动 @
-
----
-
-## 许可证
-
-MIT License — 详见 [LICENSE](LICENSE)
+> **免责声明**：本系统生成的分析结果仅供参考，不作为最终投资或信贷决策的唯一依据。
