@@ -15,7 +15,7 @@ from src.finance_risk_rag.service import RiskAnalysisService  # noqa: E402
 from src.finance_risk_rag.utils import load_json_file  # noqa: E402
 
 st.set_page_config(
-    page_title="Finance-Risk-RAG v2.2 Dashboard",
+    page_title="Finance-Risk-RAG v2.3 Dashboard",
     page_icon="🏦",
     layout="wide",
 )
@@ -28,13 +28,13 @@ if "service" not in st.session_state:
 
 service = st.session_state.service
 
-st.sidebar.title("🏦 Finance-Risk-RAG v2.2")
+st.sidebar.title("🏦 Finance-Risk-RAG v2.3")
 st.sidebar.markdown("银行级多语言财务文本风控系统")
 st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "功能菜单",
-    ["数据总览", "文档分析", "风险检索"],
+    ["数据总览", "文档分析", "风险报告", "风险检索"],
 )
 
 if page == "数据总览":
@@ -86,6 +86,36 @@ elif page == "文档分析":
                     st.dataframe(entities_df, use_container_width=True)
                 else:
                     st.success("未检测到显著风险实体。")
+
+elif page == "风险报告":
+    st.title("📄 综合风险报告")
+
+    pdf_files = list(config.docs_dir.glob("*.pdf"))
+    if not pdf_files:
+        st.warning("未发现 PDF 文档。请上传或放置 PDF 文件到 docs/ 目录。")
+    else:
+        selected_pdf = st.selectbox("选择 PDF 进行完整分析", [f.name for f in pdf_files])
+        pdf_path = config.docs_dir / selected_pdf
+
+        if st.button("生成详细报告"):
+            with st.spinner("全流程分析中 (OCR + 提取 + AI 摘要)..."):
+                try:
+                    analysis = service.analyze_document(pdf_path)
+                    report_md = service.generate_report(analysis)
+
+                    st.success("分析完成！")
+
+                    st.markdown("---")
+                    st.markdown(report_md)
+
+                    st.download_button(
+                        label="下载 Markdown 报告",
+                        data=report_md,
+                        file_name=f"{pdf_path.stem}_report.md",
+                        mime="text/markdown",
+                    )
+                except Exception as e:
+                    st.error(f"分析失败: {e}")
 
 elif page == "风险检索":
     st.title("🔍 风险检索 (RAG)")

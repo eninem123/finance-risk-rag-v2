@@ -29,7 +29,7 @@ class LLMClientWrapper:
         self._client = None
 
         if not self.api_key:
-            logger.warning("LLM API key not found.")
+            logger.warning("LLM API key not found. LLM features will be disabled.")
             return
 
         self._initialize_client()
@@ -40,7 +40,8 @@ class LLMClientWrapper:
 
             self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         except Exception as e:
-            raise LLMError(f"Failed to initialize OpenAI client: {e}")
+            logger.error(f"Failed to initialize OpenAI client: {e}")
+            self._client = None
 
     @property
     def is_available(self) -> bool:
@@ -50,7 +51,7 @@ class LLMClientWrapper:
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.0,
-        max_tokens: int = 1000,
+        max_tokens: int = 1500,
         max_retries: int = 3,
         initial_backoff: float = 1.0,
     ) -> str:
@@ -58,7 +59,7 @@ class LLMClientWrapper:
         发送聊天请求，带有指数退避重试机制。
         """
         if not self.is_available:
-            raise LLMError("LLM client not initialized.")
+            raise LLMError("LLM client not initialized or API key missing.")
 
         retries = 0
         while retries <= max_retries:
@@ -73,8 +74,9 @@ class LLMClientWrapper:
             except Exception as e:
                 retries += 1
                 if retries > max_retries:
-                    logger.error(f"LLM call failed after {max_retries} retries: {e}")
-                    raise LLMError(f"LLM call failed after {max_retries} retries: {e}")
+                    err_msg = f"LLM call failed after {max_retries} retries: {str(e)}"
+                    logger.error(err_msg)
+                    raise LLMError(err_msg)
 
                 wait_time = initial_backoff * (2 ** (retries - 1))
                 logger.warning(
@@ -83,18 +85,21 @@ class LLMClientWrapper:
                 )
                 time.sleep(wait_time)
 
-        # Should not reach here
         raise LLMError("Unexpected exit from retry loop.")
 
     def ask(self, query: str, context: str) -> str:
         messages = [
             {
                 "role": "system",
-                "content": "你是一名金融风险分析顾问，回答时引用上下文并给出简明结论。",
+                "content": (
+                    "你是一名资深的金融风险分析专家。请根据提供的上下文，"
+                    "以专业、严谨且条理清晰的方式回答用户问题。如果上下文中没有信息，"
+                    "请诚实说明。"
+                ),
             },
             {
                 "role": "user",
-                "content": f"参考以下上下文来回答问题：\n\n{context}\n\n问题：{query}",
+                "content": f"【参考上下文】\n{context}\n\n【用户问题】\n{query}",
             },
         ]
         return self.chat(messages)
