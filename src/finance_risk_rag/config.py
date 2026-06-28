@@ -6,44 +6,49 @@ Finance-Risk-RAG 配置模块
 """
 
 import os
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-@dataclass
-class Config:
+
+class Config(BaseSettings):
     """
-    系统配置类
+    系统配置类，基于 Pydantic Settings
     """
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     # ==================== 路径配置 ====================
 
     # 项目根目录
-    base_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
+    base_dir: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
 
     # BERT本地模型路径
     bert_local_path: Optional[Path] = None
 
     # Chroma向量数据库路径
-    chroma_db_dir: Path = field(default_factory=lambda: Path("rag_db"))
+    chroma_db_dir: Path = Field(default="rag_db")
 
     # 缓存目录
-    cache_dir: Path = field(default_factory=lambda: Path("cache"))
+    cache_dir: Path = Field(default="cache")
 
     # 日志目录
-    log_dir: Path = field(default_factory=lambda: Path("logs"))
+    log_dir: Path = Field(default="logs")
 
-    # 文署目录
-    docs_dir: Path = field(default_factory=lambda: Path("docs"))
+    # 文档目录
+    docs_dir: Path = Field(default="docs")
 
     # 知识库目录
-    knowledge_base_dir: Path = field(default_factory=lambda: Path("knowledge_base"))
+    knowledge_base_dir: Path = Field(default="knowledge_base")
 
     # ==================== LLM 配置 ====================
 
     llm_provider: str = "moonshot"
-    llm_api_key: Optional[str] = None
+    llm_api_key: Optional[str] = Field(default=None, validation_alias="MOONSHOT_API_KEY")
     llm_base_url: str = "https://api.moonshot.cn/v1"
     llm_model_name: str = "moonshot-v1-8k"
     max_context_tokens: int = 2000
@@ -71,21 +76,9 @@ class Config:
     chunk_overlap: int = 100
     batch_size: int = 100
 
-    def __post_init__(self) -> None:
-        """从环境变量加载配置并解析路径"""
-        self._load_from_env()
+    def model_post_init(self, __context) -> None:
+        """解析路径"""
         self._resolve_paths()
-
-    def _load_from_env(self) -> None:
-        self.llm_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("MOONSHOT_API_KEY")
-        self.llm_provider = os.getenv("LLM_PROVIDER", self.llm_provider)
-        self.llm_base_url = os.getenv("LLM_BASE_URL", self.llm_base_url)
-        self.llm_model_name = os.getenv("LLM_MODEL_NAME", self.llm_model_name)
-
-        self.tesseract_cmd = os.getenv("TESSERACT_CMD", self.tesseract_cmd)
-
-        self.chunk_size = int(os.getenv("CHUNK_SIZE", self.chunk_size))
-        self.chunk_overlap = int(os.getenv("CHUNK_OVERLAP", self.chunk_overlap))
 
     def _resolve_paths(self) -> None:
         # 将相对路径转换为绝对路径

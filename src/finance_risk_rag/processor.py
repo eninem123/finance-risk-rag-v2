@@ -1,6 +1,8 @@
 """
 Finance-Risk-RAG 文档处理模块
 ============================
+
+负责 PDF 文档解析、图像 OCR 优化以及文档自动分类。
 """
 
 import logging
@@ -12,7 +14,7 @@ import pdfplumber
 import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
 
-from .config import get_config
+from .config import Config, get_config
 from .exceptions import OCRError
 from .llm import LLMClientWrapper
 from .models import ClassificationResult
@@ -22,9 +24,22 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentProcessor:
-    """处理 PDF 文档并提取文本"""
+    """
+    文档处理器，支持 PDF 文本提取、OCR 增强和基于 LLM 的文档分类。
+    """
 
-    def __init__(self, config=None, llm_client=None):
+    def __init__(
+        self,
+        config: Optional[Config] = None,
+        llm_client: Optional[LLMClientWrapper] = None
+    ):
+        """
+        初始化文档处理器。
+
+        Args:
+            config: 系统配置对象。
+            llm_client: LLM 客户端包装类。
+        """
         self.config = config or get_config()
         self.llm_client = llm_client or LLMClientWrapper(
             api_key=self.config.llm_api_key,
@@ -35,6 +50,15 @@ class DocumentProcessor:
             pytesseract.pytesseract.tesseract_cmd = self.config.tesseract_cmd
 
     def optimize_image_for_ocr(self, image: Image.Image) -> Image.Image:
+        """
+        优化图片质量以提高 OCR 准确率。
+
+        Args:
+            image: PIL Image 对象。
+
+        Returns:
+            Image.Image: 处理后的图片。
+        """
         image = image.convert("L")
         image = image.filter(ImageFilter.MedianFilter(size=3))
         enhancer = ImageEnhance.Brightness(image)
@@ -46,6 +70,15 @@ class DocumentProcessor:
         return image
 
     def classify_document(self, text_sample: str) -> ClassificationResult:
+        """
+        使用 LLM 对文档进行分类。
+
+        Args:
+            text_sample: 文档文本样本。
+
+        Returns:
+            ClassificationResult: 分类结果。
+        """
         if not self.llm_client.is_available:
             return ClassificationResult(type="未知", confidence=0.0, reason="LLM unavailable")
 
@@ -84,6 +117,18 @@ class DocumentProcessor:
             return ClassificationResult(type="未知", confidence=0.0, reason=str(e))
 
     def extract_text_from_pdf(self, pdf_path: Path) -> Tuple[str, int]:
+        """
+        从 PDF 提取文本，必要时使用 OCR。
+
+        Args:
+            pdf_path: PDF 文件路径。
+
+        Returns:
+            Tuple[str, int]: (提取的文本, OCR 处理的页数)。
+
+        Raises:
+            OCRError: 处理过程中发生错误。
+        """
         text = f"# 文件: {pdf_path.name}\n\n"
         ocr_pages = 0
         try:
@@ -106,7 +151,15 @@ class DocumentProcessor:
             raise OCRError(f"PDF extraction failed for {pdf_path}: {e}")
 
     def process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
-        """处理单个 PDF 的方法，支持并行化"""
+        """
+        处理单个 PDF，支持缓存检查。
+
+        Args:
+            pdf_path: PDF 文件路径。
+
+        Returns:
+            Dict[str, Any]: 处理结果详情。
+        """
         file_hash = get_file_hash(pdf_path)
         log = load_json_file(self.config.processing_log_path)
         cached = log.get(pdf_path.name, {})
@@ -137,7 +190,14 @@ class DocumentProcessor:
             "ocr_version": self.config.ocr_version,
         }
 
-    def process_directory(self, docs_dir: Optional[Path] = None, max_workers: int = 4):
+    def process_directory(self, docs_dir: Optional[Path] = None, max_workers: int = 4) -> None:
+        """
+        批量处理目录下的所有 PDF。
+
+        Args:
+            docs_dir: 目标目录，默认从配置读取。
+            max_workers: 最大并行进程数。
+        """
         docs_dir = docs_dir or self.config.docs_dir
         pdf_files = list(docs_dir.glob("*.pdf"))
         log = load_json_file(self.config.processing_log_path)
@@ -170,8 +230,7 @@ class DocumentProcessor:
                         pdf = future_to_pdf[future]
                         logger.error(f"Failed to process {pdf.name}: {e}")
 
-        # 聚合结果并更新日志 (保持某种程度的顺序以便合并)
-        # Sort by name to keep all_extracted.txt consistent
+        # 聚合结果
         results.sort(key=lambda x: x["name"])
 
         for res in results:
