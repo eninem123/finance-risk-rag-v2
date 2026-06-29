@@ -22,6 +22,8 @@ class Entity:
     source: str = "rule"
     start_char: int = 0
     end_char: int = 0
+    risk_category: str = "其他"  # 风险分类，如：信用风险、合规风险、经营风险
+    impact_score: float = 1.0  # 影响程度评分 (1.0 - 5.0)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -35,6 +37,8 @@ class Entity:
             "source": self.source,
             "start_char": self.start_char,
             "end_char": self.end_char,
+            "risk_category": self.risk_category,
+            "impact_score": round(self.impact_score, 2),
             **self.metadata,
         }
 

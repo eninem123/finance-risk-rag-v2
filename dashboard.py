@@ -15,7 +15,7 @@ from src.finance_risk_rag.service import RiskAnalysisService  # noqa: E402
 from src.finance_risk_rag.utils import load_json_file  # noqa: E402
 
 st.set_page_config(
-    page_title="Finance-Risk-RAG v2.2 Dashboard",
+    page_title="Finance-Risk-RAG v2.3 Dashboard",
     page_icon="🏦",
     layout="wide",
 )
@@ -28,13 +28,13 @@ if "service" not in st.session_state:
 
 service = st.session_state.service
 
-st.sidebar.title("🏦 Finance-Risk-RAG v2.2")
-st.sidebar.markdown("银行级多语言财务文本风控系统")
+st.sidebar.title("🏦 Finance-Risk-RAG v2.3")
+st.sidebar.markdown("**银行级多语言财务文本风控系统**")
 st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "功能菜单",
-    ["数据总览", "文档分析", "风险检索"],
+    ["数据总览", "风险矩阵", "文档分析", "风险检索"],
 )
 
 if page == "数据总览":
@@ -61,6 +61,54 @@ if page == "数据总览":
     else:
         st.info("请先执行文档处理。")
 
+elif page == "风险矩阵":
+    st.title("🎯 风险矩阵 (Risk Matrix)")
+    st.markdown("基于 **影响程度 (Impact)** 与 **发生概率 (Confidence)** 的风险量化视图。")
+
+    # 尝试加载已有的实体数据
+    entities_file = config.docs_dir / "entities_extracted.json"
+    if entities_file.exists():
+        data = load_json_file(entities_file)
+        if "entities" in data:
+            df = pd.DataFrame(data["entities"])
+            if not df.empty:
+                # 绘制散点图作为风险矩阵
+                import plotly.express as px
+
+                fig = px.scatter(
+                    df,
+                    x="confidence",
+                    y="impact_score",
+                    size="risk_score",
+                    color="risk_category",
+                    hover_name="text",
+                    labels={
+                        "confidence": "置信度 (Probability)",
+                        "impact_score": "影响程度 (Impact)",
+                    },
+                    title="风险实体分布矩阵",
+                    range_x=[0, 1.1],
+                    range_y=[0, 6],
+                )
+                # 添加象限背景线 (简化实现)
+                fig.add_shape(type="line", x0=0.5, y0=0, x1=0.5, y1=6, line=dict(color="Red", dash="dash"))
+                fig.add_shape(type="line", x0=0, y0=3, x1=1.1, y1=3, line=dict(color="Red", dash="dash"))
+
+                st.plotly_chart(fig, use_container_width=True)
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("风险类别占比")
+                    cat_counts = df["risk_category"].value_counts()
+                    st.write(cat_counts)
+                with col2:
+                    st.subheader("高风险实体 Top 5")
+                    st.dataframe(df.sort_values("risk_score", ascending=False).head(5)[["text", "risk_category", "risk_score"]])
+            else:
+                st.info("尚未提取到风险实体。")
+    else:
+        st.info("请先在'文档分析'页面提取风险实体。")
+
 elif page == "文档分析":
     st.title("📑 文档分析")
 
@@ -84,6 +132,10 @@ elif page == "文档分析":
                 if result.entities:
                     entities_df = pd.DataFrame([e.to_dict() for e in result.entities])
                     st.dataframe(entities_df, use_container_width=True)
+
+                    # 自动保存一份结果用于风险矩阵展示
+                    from src.finance_risk_rag.utils import save_json_file
+                    save_json_file(result.to_dict(), config.docs_dir / "entities_extracted.json")
                 else:
                     st.success("未检测到显著风险实体。")
 

@@ -8,11 +8,41 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from .config import get_config
 
 PathLike = Union[str, Path]
+
+
+class PIIMasker:
+    """
+    个人隐私信息（PII）脱敏工具类。
+    用于在将数据发送给外部 LLM 之前屏蔽敏感信息。
+    """
+
+    def __init__(self):
+        # 定义常见 PII 的正则表达式
+        self.patterns = {
+            "email": r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",
+            "phone": r"(?:\+86)?1[3-9]\d{9}",
+            "bank_card": r"\b\d{16,19}\b",
+            "id_card": r"\b\d{15}|\d{18}|(?:\d{17}[xX])\b",
+        }
+        self.compiled_patterns = {k: re.compile(v) for k, v in self.patterns.items()}
+
+    def mask(self, text: str) -> str:
+        """
+        对文本中的 PII 进行脱敏。
+        """
+        if not text:
+            return ""
+
+        masked_text = text
+        for label, pattern in self.compiled_patterns.items():
+            masked_text = pattern.sub(f"[MASKED_{label.upper()}]", masked_text)
+
+        return masked_text
 
 
 def ensure_dirs(*dirs: PathLike) -> None:

@@ -1,118 +1,94 @@
-# Finance-Risk-RAG v2.2
+# Finance-Risk-RAG v2.3
 
 <div align="center">
 
-**银行级多语言财务文本风控 AI 系统**
+**企业级多语言财务文本风控 AI 系统**
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-v2.2-blue?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-v2.3-blue?style=flat-square)]()
+[![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063?style=flat-square)](https://docs.pydantic.dev/)
 
-OCR 智能识别 · BERT 实体提取 · RAG 风险问答 · Streamlit 可视化面板
+异步管道 · PII 数据脱敏 · 风险矩阵分析 · 银行级风控编排
 
 </div>
 
 ---
 
-## 项目简介
+## 🏛️ 系统使命：风险治理 (Risk Governance)
 
-Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，整合 OCR、BERT 实体提取、规则引擎与 RAG 检索增强生成，支持批量 PDF 处理、风险实体识别与智能问答。
-
-> 本仓库为**个人闲置测试项目**，代码已收敛至 `main` 主线 v2.2 稳定版。
+Finance-Risk-RAG 致力于为金融机构提供一套**透明、可审计、高可靠**的财务文本风险治理方案。通过整合先进的 NLP 提取能力与 RAG 检索技术，我们在保障数据隐私（PII 脱敏）的前提下，实现对海量财务报表的智能化合规审查与风险量化。
 
 ---
 
-## v2.2 核心能力
+## 🚀 核心架构
 
-| 模块 | 说明 |
-|------|------|
-| `RiskAnalysisService` | 业务编排层，协调 OCR → 分类 → 提取 → RAG |
-| `dashboard.py` | Streamlit 交互式面板（数据总览 / 文档分析 / 风险检索） |
-| `main.py report` | 生成 Markdown + JSON 综合风险报告 |
-| BERT 长文本切片 | 滑动窗口 Overlap Chunking，支持长文档 |
-| 精准偏移定位 | Entity 模型含 `start_char` / `end_char` |
+```mermaid
+graph TD
+    A[PDF/Image Docs] --> B[OCR & Text Processor]
+    B --> C[Compliance Guardrail: PII Masker]
+    C --> D[Risk Analysis Service]
+    D --> E[BERT & Rule Extraction]
+    D --> F[RAG Engine: ChromaDB]
+    E --> G[Multi-factor Scoring Engine]
+    G --> H[Risk Matrix & Dashboard]
+    F --> I[AI Financial Advisor]
+```
 
 ---
 
-## 快速开始
+## 🌟 系统能力 (System Capabilities)
+
+### 1. 金融级风险量化 (Quantified Risk Scoring)
+- **多维度评分策略**: 结合 BERT 置信度、关键词权重（逾期、违约、资不抵债等）及上下文关联进行动态调分。
+- **风险分类映射**: 自动将风险点归类为信用风险、财务风险、机构风险、法律合规风险等。
+
+### 2. 生产环境可用性 (Production Ready)
+- **异步并行处理**: LLM 客户端全面支持 `asyncio`，大幅提升批量处理性能。
+- **配置健壮性**: 基于 `Pydantic Settings` 的配置系统，支持 `.env` 自动化加载。
+- **PII 安全脱敏**: 自动识别并屏蔽银行账号、身份证号、邮箱等敏感信息，确保 LLM 交互合规。
+
+### 3. 专业可视化面板 (Advanced Dashboard)
+- **风险分布矩阵**: 通过 Plotly 呈现 影响程度 vs 发生概率 的四象限视图。
+- **智能风险问答**: 结合本地知识库的 RAG 系统，提供具备事实支撑的风险分析。
+
+---
+
+## 🛠️ 开发者指南
+
+我们提供了 `Makefile` 以简化日常开发流程：
 
 ```bash
-git clone https://github.com/eninem123/finance-risk-rag-v2.git
-cd finance-risk-rag-v2
-pip install -r requirements.txt
+# 安装生产与开发依赖
+make install
 
-# 全流程处理
+# 启动专业可视化面板
+make dashboard
+
+# 运行自动化测试套件
+make test
+
+# 执行代码风格检查
+make lint
+```
+
+---
+
+## 📊 快速启动 CLI
+
+```bash
+# 全流程处理 PDF
 python main.py process --input ./docs/
 
-# RAG 问答
-python main.py query "这笔贷款有哪些风险点？"
+# 生成企业级风险报告
+python main.py report --input sample.pdf --output-dir reports/
 
-# 生成风险报告
-python main.py report --input document.pdf --output-dir reports/
-
-# 启动可视化面板
-python main.py dashboard
+# 智能风险检索 (支持异步)
+python main.py query "该公司的流动性风险如何？"
 ```
 
 ---
 
-## 项目结构
+## ⚖️ 许可证
 
-```
-finance-risk-rag-v2/
-├── src/finance_risk_rag/
-│   ├── service.py          # 业务编排服务层 (v2.2)
-│   ├── extractor.py        # 实体提取管道
-│   ├── processor.py        # 文档 OCR 处理
-│   ├── engine.py           # RAG 引擎
-│   └── ...
-├── dashboard.py            # Streamlit 可视化面板
-├── main.py                 # 统一 CLI 入口
-├── tests/                  # 单元测试
-└── .github/workflows/      # CI（仅 PR → main 触发）
-```
-
----
-
-## 2026-06 仓库整理记录
-
-### 合并 PR（#11–#17 → main）
-
-| PR | 分支 | 内容 |
-|----|------|------|
-| #11 | `feature/professional-v2.1-optimization-*` | v2.1 架构优化 |
-| #12 | `feature/enterprise-optimization-*` | 企业服务层 + 报告生成 |
-| #13 | `optimize-finance-risk-rag-v2.2-*` | v2.2 服务层重构 |
-| #14 | `feature/professional-refactoring-and-dashboard-*` | 服务层 + 仪表盘 |
-| #15 | `feature/v2.2-optimization-7723*` | v2.2 架构升级 |
-| #16 | `feature/optimize-architecture-v2.2-*` | 架构优化 + Dashboard |
-| #17 | `feature/v2.2-optimization-1572*` | v2.2 全面升级 |
-| #18 | `feature/professional-refactoring-and-dashboard-v2.2-*` | 已合并至 main（2026-06-20） |
-| #19 | `feature/professional-refactoring-and-dashboard-v2.2-*` | **当前唯一迭代入口（Draft PR）** |
-
-### 删除分支（8 个 feature 临时分支）
-
-- `feature/enterprise-optimization-5050392069136229718`
-- `feature/optimize-architecture-v2.2-18168074359074526671`
-- `feature/professional-refactoring-and-dashboard-4562812990206762378`
-- `feature/professional-refactoring-and-dashboard-v2.2-2030757817022327085`
-- `feature/professional-v2.1-optimization-5571732041245732993`
-- `feature/v2.2-optimization-15723274487901237107`
-- `feature/v2.2-optimization-7723375731582770803`
-- `optimize-finance-risk-rag-v2.2-647354061673373050`
-
-### CI 降噪变更
-
-- 移除 `push` 自动触发，**仅 `pull_request → main`** 时运行
-- 取消 Python 多版本矩阵与 lint / test 重复步骤
-- 简化为单版本基础编译校验（`py_compile` + `compileall`）
-
-### Bot 降噪变更
-
-- 新增 `.cursor/rules/bot-noise-reduction.mdc`：禁止自动 PR 评论与 CI 告警回复，仅响应手动 @
-
----
-
-## 许可证
-
-MIT License — 详见 [LICENSE](LICENSE)
+本项目基于 MIT 许可证开源。所有功能旨在辅助金融风险分析，不作为法律或财务决策的唯一依据。
