@@ -5,6 +5,7 @@ Finance-Risk-RAG 实体提取模块
 
 import logging
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Set, Tuple, Union
 
@@ -16,7 +17,73 @@ from .utils import calculate_risk_level, clean_text, load_json_file
 logger = logging.getLogger(__name__)
 
 
-class RuleBasedExtractor:
+class ScoringStrategy(ABC):
+    """评分策略基类"""
+
+    @abstractmethod
+    def calculate(self, entity: Entity, context_text: str) -> Entity:
+        pass
+
+
+class FinanceRiskScoringStrategy(ScoringStrategy):
+    """金融级多维度评分策略"""
+
+    def __init__(self):
+        # 核心金融风险关键词及其权重
+        self.risk_boosters = {
+            "逾期": 1.5,
+            "亏损": 1.4,
+            "违约": 1.6,
+            "资不抵债": 1.8,
+            "诉讼": 1.3,
+            "负债": 1.2,
+            "风险": 1.2,
+            "破产": 1.9,
+        }
+
+        # 风险分类映射
+        self.category_map = {
+            "RISK": "一般风险",
+            "MONEY": "财务风险",
+            "ORG": "机构风险",
+            "PER": "个人风险",
+            "CREDIT": "信用风险",
+            "LEGAL": "合规/法律风险",
+        }
+
+    def calculate(self, entity: Entity, context_text: str) -> Entity:
+        # 1. 基础评分调整：结合置信度
+        score = entity.risk_score * (0.5 + 0.5 * entity.confidence)
+
+        # 2. 关键词加权：检测上下文中的风险触发词
+        impact_boost = 1.0
+        # 优先使用 entity.context，如果为空则使用 context_text (但在本系统中 extractor 应该已经填充了 context)
+        search_text = entity.context or context_text
+
+        for word, boost in self.risk_boosters.items():
+            if word in entity.text or word in search_text:
+                score *= boost
+                impact_boost = max(impact_boost, boost * 2)
+
+        # 3. 映射风险分类
+        entity.risk_category = self.category_map.get(entity.type.upper(), "其他风险")
+
+        # 4. 设置最终评分和影响度
+        entity.risk_score = int(min(100, score))
+        entity.impact_score = min(5.0, impact_boost)
+
+        return entity
+
+
+class BaseExtractor(ABC):
+    """提取器基类"""
+
+    @abstractmethod
+    def extract(self, text: str) -> List[Entity]:
+        pass
+
+
+class RuleBasedExtractor(BaseExtractor):
     """基于规则的实体提取器"""
 
     def __init__(self, config=None, rules_path: Optional[Path] = None):
@@ -46,8 +113,6 @@ class RuleBasedExtractor:
             base_risk_score = config.get("risk_score", 10)
 
             for keyword in keywords:
-                # Use regex for better matching, but avoid \b for CJK
-                # Basic implementation: find all occurrences
                 for match in re.finditer(re.escape(keyword), text, re.IGNORECASE):
                     start = match.start()
                     end = match.end()
@@ -75,7 +140,7 @@ class RuleBasedExtractor:
         return entities
 
 
-class BERTExtractor:
+class BERTExtractor(BaseExtractor):
     """基于 BERT 的实体提取器"""
 
     def __init__(self, model_path: Optional[Path] = None):
@@ -109,27 +174,34 @@ class BERTExtractor:
             logger.warning(f"Failed to load BERT model: {e}")
             self.model = None
 
+    @property
     def is_available(self) -> bool:
         return self.model is not None
 
     def extract(self, text: str) -> List[Entity]:
-        if not self.is_available() or not text:
+        if not self.is_available or not text:
             return []
 
         try:
             results = self.nlp(text)
             entities = []
             for res in results:
+                start = res["start"]
+                end = res["end"]
+                context_start = max(0, start - 40)
+                context_end = min(len(text), end + 40)
+                context = text[context_start:context_end].replace("\n", " ").strip()
+
                 entities.append(
                     Entity(
                         type=res["entity_group"],
                         text=res["word"],
                         risk_score=20,  # Default risk score for BERT entities
                         confidence=float(res["score"]),
-                        context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
+                        context=context,
                         source="bert",
-                        start_char=res["start"],
-                        end_char=res["end"],
+                        start_char=start,
+                        end_char=end,
                     )
                 )
             return entities
@@ -141,10 +213,17 @@ class BERTExtractor:
 class EntityExtractionPipeline:
     """实体提取管道"""
 
-    def __init__(self, config=None, rule_extractor=None, bert_extractor=None):
+    def __init__(
+        self,
+        config=None,
+        rule_extractor=None,
+        bert_extractor=None,
+        scoring_strategy=None,
+    ):
         self.config = config or get_config()
         self.rule_extractor = rule_extractor or RuleBasedExtractor(config=self.config)
         self.bert_extractor = bert_extractor or BERTExtractor(self.config.bert_local_path)
+        self.scoring_strategy = scoring_strategy or FinanceRiskScoringStrategy()
 
     def process(self, text_or_path: Union[str, Path]) -> ExtractionResult:
         if isinstance(text_or_path, Path):
@@ -157,14 +236,19 @@ class EntityExtractionPipeline:
         rule_entities = self.rule_extractor.extract(text)
         bert_entities = self.bert_extractor.extract(text)
 
-        # Advanced merging logic: Score-based arbitration and overlap resolution
-        entities_list = self._merge_and_arbitrate(rule_entities, bert_entities)
+        # 1. 合并并仲裁重叠
+        merged_entities = self._merge_and_arbitrate(rule_entities, bert_entities)
 
-        total_risk = sum(e.risk_score for e in entities_list)
+        # 2. 应用高级评分策略
+        final_entities = [
+            self.scoring_strategy.calculate(e, text) for e in merged_entities
+        ]
+
+        total_risk = sum(e.risk_score for e in final_entities)
         risk_level = calculate_risk_level(total_risk)
 
         return ExtractionResult(
-            entities=entities_list, total_risk_score=total_risk, risk_level=risk_level
+            entities=final_entities, total_risk_score=total_risk, risk_level=risk_level
         )
 
     def _merge_and_arbitrate(
@@ -186,7 +270,6 @@ class EntityExtractionPipeline:
         for current in all_entities:
             is_redundant = False
             for existing in final_entities:
-                # 使用字符偏移量进行精确的重叠检测
                 overlap = max(current.start_char, existing.start_char) < min(
                     current.end_char, existing.end_char
                 )
