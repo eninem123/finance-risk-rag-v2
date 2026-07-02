@@ -19,7 +19,7 @@ class TestRiskAnalysisService(unittest.TestCase):
             config=self.mock_config, processor=self.mock_processor, extractor=self.mock_extractor
         )
 
-    def test_run_full_analysis(self):
+    def test_analyze_document(self):
         # 准备 Mock 返回值
         mock_pdf = Path("test.pdf")
         self.mock_processor.process_single_pdf.return_value = {
@@ -29,12 +29,16 @@ class TestRiskAnalysisService(unittest.TestCase):
         }
 
         mock_entities = [Entity(type="RISK", text="debt", risk_score=30, confidence=0.8)]
+        # pipeline is used in analyze_document
         self.mock_extractor.process.return_value = ExtractionResult(
             entities=mock_entities, total_risk_score=30, risk_level="低风险"
         )
 
+        # Mock LLM summary
+        self.mock_processor.llm_client.chat.return_value = "Summary text"
+
         # 执行
-        result = self.service.run_full_analysis(mock_pdf)
+        result = self.service.analyze_document(mock_pdf)
 
         # 断言
         self.assertEqual(result["document_info"]["name"], "test.pdf")
@@ -50,6 +54,7 @@ class TestRiskAnalysisService(unittest.TestCase):
                 "name": "test.pdf",
                 "analyzed_at": "2024-01-01",
             },
+            "executive_summary": "Test Summary",
             "classification": {"type": "审计报告", "confidence": 0.9, "reason": "test"},
             "risk_analysis": {
                 "risk_level": "中风险",
@@ -72,6 +77,7 @@ class TestRiskAnalysisService(unittest.TestCase):
 
         # 断言
         self.assertIn("# 财务风险分析报告: test.pdf", report)
+        self.assertIn("Test Summary", report)
         self.assertIn("中风险", report)
         self.assertIn("bad debt", report)
         self.assertIn("💡 **建议**", report)

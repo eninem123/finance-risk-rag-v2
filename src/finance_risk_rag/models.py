@@ -18,6 +18,7 @@ class Entity:
     text: str
     risk_score: int
     confidence: float
+    impact_score: int = 0
     context: str = ""
     source: str = "rule"
     start_char: int = 0
@@ -31,6 +32,7 @@ class Entity:
             "text": self.text,
             "risk_score": self.risk_score,
             "confidence": round(self.confidence, 4),
+            "impact_score": self.impact_score,
             "context": self.context,
             "source": self.source,
             "start_char": self.start_char,

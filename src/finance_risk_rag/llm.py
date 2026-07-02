@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from .config import get_config
 from .exceptions import LLMError
+from .utils import PIIMasker
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class LLMClientWrapper:
         self.base_url = base_url or config.llm_base_url
         self.model_name = model_name or config.llm_model_name
         self._client = None
+        self._masker = PIIMasker()
 
         if not self.api_key:
             logger.warning("LLM API key not found.")
@@ -60,12 +62,19 @@ class LLMClientWrapper:
         if not self.is_available:
             raise LLMError("LLM client not initialized.")
 
+        # 对发送给 LLM 的消息进行脱敏处理，确保合规
+        masked_messages = []
+        for msg in messages:
+            masked_messages.append(
+                {"role": msg["role"], "content": self._masker.mask(msg["content"])}
+            )
+
         retries = 0
         while retries <= max_retries:
             try:
                 response = self._client.chat.completions.create(
                     model=self.model_name,
-                    messages=messages,
+                    messages=masked_messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )

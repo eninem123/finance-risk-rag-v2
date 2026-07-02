@@ -66,6 +66,7 @@ class RuleBasedExtractor:
                             text=keyword,
                             risk_score=base_risk_score,
                             confidence=1.0,
+                            impact_score=base_risk_score,
                             context=context,
                             source="rule",
                             start_char=start,
@@ -88,11 +89,7 @@ class BERTExtractor:
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import (
-                AutoModelForTokenClassification,
-                AutoTokenizer,
-                pipeline,
-            )
+            from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
@@ -120,12 +117,15 @@ class BERTExtractor:
             results = self.nlp(text)
             entities = []
             for res in results:
+                confidence = float(res["score"])
+                risk_score = 20
                 entities.append(
                     Entity(
                         type=res["entity_group"],
                         text=res["word"],
-                        risk_score=20,  # Default risk score for BERT entities
-                        confidence=float(res["score"]),
+                        risk_score=risk_score,
+                        confidence=confidence,
+                        impact_score=int(risk_score * confidence),
                         context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
                         source="bert",
                         start_char=res["start"],
@@ -172,14 +172,23 @@ class EntityExtractionPipeline:
     ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理重叠。
-        优先考虑高分和高置信度的实体。
+        仲裁逻辑：
+        1. 如果 BERT 置信度 > 0.85 且与规则重叠，优先选择 BERT 实体。
+        2. 否则，按得分和置信度排序，优先选择高分实体。
         """
         all_entities = rule_entities + bert_entities
         if not all_entities:
             return []
 
-        # 按得分和置信度排序
-        all_entities.sort(key=lambda x: (x.risk_score, x.confidence), reverse=True)
+        # 排序：优先考虑高置信度的 BERT 实体，然后是得分
+        all_entities.sort(
+            key=lambda x: (
+                1 if (x.source == "bert" and x.confidence > 0.85) else 0,
+                x.risk_score,
+                x.confidence,
+            ),
+            reverse=True,
+        )
 
         final_entities: List[Entity] = []
 
@@ -191,6 +200,8 @@ class EntityExtractionPipeline:
                     current.end_char, existing.end_char
                 )
                 if overlap:
+                    # 只有当 current 比 existing "弱" 时才标记为冗余
+                    # 由于我们已经排好序，current 理论上不会比 existing 强
                     is_redundant = True
                     break
 
