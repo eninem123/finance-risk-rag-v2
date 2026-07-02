@@ -157,3 +157,30 @@ def calculate_risk_level(score: float) -> str:
         return "高风险"
     else:
         return "极高风险"
+
+
+class PIIMasker:
+    """
+    PII (个人身份信息) 脱敏工具类。
+    提供针对财务场景的敏感信息（银行卡、身份证、邮箱等）的正则脱敏。
+    """
+
+    def __init__(self):
+        # 常见敏感信息正则模式
+        self.patterns = {
+            "email": r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",
+            "bank_card": r"\b(?:\d[ -]*?){13,19}\b",
+            "id_card": r"\b\d{15}(\d{2}[0-9xX])?\b",
+            "phone": r"\b1[3-9]\d{9}\b",
+        }
+
+    def mask(self, text: str) -> str:
+        """对文本中的敏感信息进行脱敏处理"""
+        if not text:
+            return ""
+
+        masked_text = text
+        for label, pattern in self.patterns.items():
+            masked_text = re.sub(pattern, f"[{label.upper()}_MASKED]", masked_text)
+
+        return masked_text
