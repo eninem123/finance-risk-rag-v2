@@ -15,6 +15,34 @@ from .config import get_config
 PathLike = Union[str, Path]
 
 
+class PIIMasker:
+    """
+    个人隐私信息（PII）脱敏工具类。
+    支持对常见敏感财务和个人信息进行正则脱敏。
+    """
+
+    # 常见 PII 正则表达式
+    PATTERNS = {
+        "email": r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",
+        "bank_card": r"\b(?:\d[ -]*?){13,19}\b",
+        "id_card": r"\b\d{15}(\d{2}[0-9xX])?\b",
+        "phone": r"\b1[3-9]\d{9}\b",
+    }
+
+    @classmethod
+    def mask(cls, text: str) -> str:
+        """对文本中的 PII 进行脱敏"""
+        if not text:
+            return ""
+
+        masked_text = text
+        for label, pattern in cls.PATTERNS.items():
+            masked_text = re.sub(
+                pattern, f"[MASKED_{label.upper()}]", masked_text, flags=re.IGNORECASE
+            )
+        return masked_text
+
+
 def ensure_dirs(*dirs: PathLike) -> None:
     for dir_path in dirs:
         path = Path(dir_path)
@@ -63,18 +91,18 @@ def split_text_by_sentence(text: str, max_len: int = 400, min_len: int = 50) -> 
     if not text:
         return []
 
-    # 改进的句子分隔符，更好地处理中英文混排
-    sentence_seps = r"([。！？；.!?;])(?![0-9])"
+    # 改进的句子分隔符，更好地处理中英文混排，排除数字中的点
+    sentence_seps = r"(?<!\d)([。！？；.!?;])(?![0-9.])"
 
     # 使用捕获分组保留分隔符
-    raw_parts = re.split(sentence_seps, text)
+    parts = re.split(sentence_seps, text)
 
-    # 重组句子
+    # 重新组合
     sentences = []
-    for i in range(0, len(raw_parts) - 1, 2):
-        sentences.append(raw_parts[i] + raw_parts[i + 1])
-    if len(raw_parts) % 2 == 1 and raw_parts[-1]:
-        sentences.append(raw_parts[-1])
+    for i in range(0, len(parts) - 1, 2):
+        sentences.append(parts[i] + parts[i + 1])
+    if len(parts) % 2 == 1:
+        sentences.append(parts[-1])
 
     # 智能合并，确保分块不会太碎且不超过 max_len
     chunks: List[str] = []
@@ -90,7 +118,7 @@ def split_text_by_sentence(text: str, max_len: int = 400, min_len: int = 50) -> 
         else:
             if current_chunk:
                 chunks.append(current_chunk)
-            # 如果单句就超过 max_len，强制截断（虽然罕见）
+            # 如果单句就超过 max_len，强制截断
             if len(sent) > max_len:
                 for i in range(0, len(sent), max_len):
                     chunks.append(sent[i : i + max_len])

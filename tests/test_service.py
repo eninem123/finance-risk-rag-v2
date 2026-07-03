@@ -14,34 +14,49 @@ class TestRiskAnalysisService(unittest.TestCase):
     def setUp(self):
         self.mock_config = MagicMock()
         self.mock_processor = MagicMock()
-        self.mock_extractor = MagicMock()
+        self.mock_pipeline = MagicMock()
+        # Mock engine to avoid DB init
+        self.mock_engine = MagicMock()
+
         self.service = RiskAnalysisService(
-            config=self.mock_config, processor=self.mock_processor, extractor=self.mock_extractor
+            config=self.mock_config,
+            processor=self.mock_processor,
+            pipeline=self.mock_pipeline,
+            engine=self.mock_engine
         )
 
     def test_run_full_analysis(self):
-        # 准备 Mock 返回值
+        # Create a real file for Path.is_file() to work
         mock_pdf = Path("test.pdf")
-        self.mock_processor.process_single_pdf.return_value = {
-            "text": "sample text",
-            "classification": {"type": "审计报告", "confidence": 0.9, "reason": "test"},
-            "hash": "abc",
-        }
+        mock_pdf.touch()
 
-        mock_entities = [Entity(type="RISK", text="debt", risk_score=30, confidence=0.8)]
-        self.mock_extractor.process.return_value = ExtractionResult(
-            entities=mock_entities, total_risk_score=30, risk_level="低风险"
-        )
+        try:
+            # 准备 Mock 返回值
+            self.mock_processor.process_single_pdf.return_value = {
+                "text": "sample text",
+                "classification": {"type": "审计报告", "confidence": 0.9, "reason": "test"},
+                "hash": "abc",
+                "ocr_pages": 0,
+                "ocr_version": "v2.3"
+            }
 
-        # 执行
-        result = self.service.run_full_analysis(mock_pdf)
+            mock_entities = [Entity(type="RISK", text="debt", risk_score=30, confidence=0.8)]
+            self.mock_pipeline.process.return_value = ExtractionResult(
+                entities=mock_entities, total_risk_score=30, risk_level="低风险"
+            )
 
-        # 断言
-        self.assertEqual(result["document_info"]["name"], "test.pdf")
-        self.assertEqual(result["classification"]["type"], "审计报告")
-        self.assertEqual(result["risk_analysis"]["total_risk_score"], 30)
-        self.mock_processor.process_single_pdf.assert_called_once_with(mock_pdf)
-        self.mock_extractor.process.assert_called_once()
+            # 执行
+            result = self.service.run_full_analysis(mock_pdf)
+
+            # 断言
+            self.assertEqual(result["document_info"]["name"], "test.pdf")
+            self.assertEqual(result["classification"]["type"], "审计报告")
+            self.assertEqual(result["risk_analysis"]["total_risk_score"], 30)
+            self.mock_processor.process_single_pdf.assert_called_once_with(mock_pdf)
+            self.mock_pipeline.process.assert_called_once()
+        finally:
+            if mock_pdf.exists():
+                mock_pdf.unlink()
 
     def test_generate_report(self):
         # 准备数据
@@ -74,7 +89,7 @@ class TestRiskAnalysisService(unittest.TestCase):
         self.assertIn("# 财务风险分析报告: test.pdf", report)
         self.assertIn("中风险", report)
         self.assertIn("bad debt", report)
-        self.assertIn("💡 **建议**", report)
+        self.assertIn("⚠️ **中度关注**", report)
 
 
 if __name__ == "__main__":
