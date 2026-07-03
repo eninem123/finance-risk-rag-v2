@@ -3,6 +3,7 @@ Finance-Risk-RAG 文档处理模块
 ============================
 """
 
+import json
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -10,7 +11,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import pdfplumber
 import pytesseract
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 from .config import get_config
 from .exceptions import OCRError
@@ -22,77 +23,94 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentProcessor:
-    """处理 PDF 文档并提取文本"""
+    """处理 PDF 文档并提取文本，支持高级 OCR 预处理和智能分类"""
 
     def __init__(self, config=None, llm_client=None):
         self.config = config or get_config()
-        self.llm_client = llm_client or LLMClientWrapper(
-            api_key=self.config.llm_api_key,
-            base_url=self.config.llm_base_url,
-            model_name=self.config.llm_model_name,
-        )
+        self.llm_client = llm_client or LLMClientWrapper()
         if self.config.tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = self.config.tesseract_cmd
 
     def optimize_image_for_ocr(self, image: Image.Image) -> Image.Image:
+        """
+        高级图像预处理：
+        1. 灰度化 -> 2. 自动对比度 -> 3. 中值滤波 -> 4. 锐化 -> 5. 二值化
+        """
+        # 1. 灰度化
         image = image.convert("L")
+
+        # 2. 自动对比度优化
+        image = ImageOps.autocontrast(image)
+
+        # 3. 中值滤波去噪
         image = image.filter(ImageFilter.MedianFilter(size=3))
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(1.2)
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(2.5)
-        image = image.filter(ImageFilter.SHARPEN)
-        image = image.point(lambda x: 0 if x < 140 else 255, "1")
+
+        # 4. 增强锐度
+        enhancer = ImageEnhance.Sharpness(image)
+        image = enhancer.enhance(2.0)
+
+        # 5. 自适应二值化 (模拟)
+        image = image.point(lambda x: 0 if x < 150 else 255, "1")
+
         return image
 
     def classify_document(self, text_sample: str) -> ClassificationResult:
+        """
+        利用 LLM 对文档进行智能分类。
+        """
         if not self.llm_client.is_available:
             return ClassificationResult(type="未知", confidence=0.0, reason="LLM unavailable")
 
         prompt = f"""
-请判断以下财务文档属于哪一类？输出 JSON 格式。
+请分析以下财务文档的内容片段，并将其归类为以下之一。输出严格的 JSON 格式。
 
-文本样本：
+文档片段：
 {text_sample[:3000]}
 
-【可选类别】
+【候选类别】
 1. 审计报告
 2. 行业报告
 3. 公司研究报告
-4. 上市手册
+4. 招股说明书
 5. 财报
 6. 其他
 
-【输出要求】
-- 仅输出 JSON 格式
-- 示例：{{"type": "行业报告", "confidence": 0.93, "reason": "..."}}
+【输出示例】
+{{"type": "财报", "confidence": 0.95, "reason": "文中包含资产负债表和利润表关键字。"}}
 """
         try:
-            import json
+            response = self.llm_client.chat([{"role": "user", "content": prompt}], temperature=0.1)
 
-            response = self.llm_client.chat([{"role": "user", "content": prompt}], temperature=0.2)
+            # 解析 JSON
             start = response.find("{")
             end = response.rfind("}") + 1
-            data = json.loads(response[start:end])
-            return ClassificationResult(
-                type=data.get("type", "其他"),
-                confidence=data.get("confidence", 0.0),
-                reason=data.get("reason", ""),
-            )
+            if start != -1 and end != -1:
+                data = json.loads(response[start:end])
+                return ClassificationResult(
+                    type=data.get("type", "其他"),
+                    confidence=data.get("confidence", 0.0),
+                    reason=data.get("reason", ""),
+                )
+            return ClassificationResult(type="未知", confidence=0.0, reason="JSON parse failed")
         except Exception as e:
             logger.error(f"Classification failed: {e}")
             return ClassificationResult(type="未知", confidence=0.0, reason=str(e))
 
     def extract_text_from_pdf(self, pdf_path: Path) -> Tuple[str, int]:
+        """
+        从 PDF 提取文本，如果文本内容过少则触发 OCR。
+        """
         text = f"# 文件: {pdf_path.name}\n\n"
         ocr_pages = 0
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 for i, page in enumerate(pdf.pages):
                     page_text = page.extract_text()
-                    if page_text and len(page_text.strip()) > 50:
+                    # 启发式判断：如果文本量太少，可能是扫描件
+                    if page_text and len(page_text.strip()) > 100:
                         text += f"\n--- Page {i+1} (Text) ---\n{page_text}"
                     else:
+                        # 触发 OCR
                         img = page.to_image(resolution=self.config.ocr_dpi).original
                         img = self.optimize_image_for_ocr(img)
                         ocr_text = pytesseract.image_to_string(
@@ -106,7 +124,7 @@ class DocumentProcessor:
             raise OCRError(f"PDF extraction failed for {pdf_path}: {e}")
 
     def process_single_pdf(self, pdf_path: Path) -> Dict[str, Any]:
-        """处理单个 PDF 的方法，支持并行化"""
+        """处理单个 PDF，支持缓存检查"""
         file_hash = get_file_hash(pdf_path)
         log = load_json_file(self.config.processing_log_path)
         cached = log.get(pdf_path.name, {})
@@ -117,7 +135,7 @@ class DocumentProcessor:
             and cached.get("ocr_version") == self.config.ocr_version
             and txt_path.exists()
         ):
-            logger.info(f"Skipping {pdf_path.name} (cached)")
+            logger.info(f"Using cached result for {pdf_path.name}")
             text = txt_path.read_text(encoding="utf-8")
             classification_dict = cached.get("classification", {"type": "未知", "confidence": 0.0})
             ocr_count = cached.get("ocr_pages", 0)
@@ -125,6 +143,8 @@ class DocumentProcessor:
             logger.info(f"Processing {pdf_path.name}")
             text, ocr_count = self.extract_text_from_pdf(pdf_path)
             txt_path.write_text(text, encoding="utf-8")
+
+            # 分类逻辑
             classification = self.classify_document(text)
             classification_dict = classification.to_dict()
 
@@ -138,6 +158,7 @@ class DocumentProcessor:
         }
 
     def process_directory(self, docs_dir: Optional[Path] = None, max_workers: int = 4):
+        """批量处理目录"""
         docs_dir = docs_dir or self.config.docs_dir
         pdf_files = list(docs_dir.glob("*.pdf"))
         log = load_json_file(self.config.processing_log_path)
@@ -147,10 +168,9 @@ class DocumentProcessor:
         results = []
 
         if not pdf_files:
-            logger.info("No PDF files found to process.")
+            logger.info("No PDF files found.")
             return
 
-        # 并行处理文件
         if max_workers <= 1:
             for pdf in pdf_files:
                 try:
@@ -167,11 +187,8 @@ class DocumentProcessor:
                         res = future.result()
                         results.append(res)
                     except Exception as e:
-                        pdf = future_to_pdf[future]
-                        logger.error(f"Failed to process {pdf.name}: {e}")
+                        logger.error(f"Parallel processing error: {e}")
 
-        # 聚合结果并更新日志 (保持某种程度的顺序以便合并)
-        # Sort by name to keep all_extracted.txt consistent
         results.sort(key=lambda x: x["name"])
 
         for res in results:
