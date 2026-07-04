@@ -19,7 +19,7 @@ from src.finance_risk_rag.utils import save_json_file, setup_logger  # noqa: E40
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Finance-Risk-RAG: 银行级财务文本风控 AI 系统 (v2.2)",
+        description="Finance-Risk-RAG: 银行级财务文本风控 AI 系统 (v2.3)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command", help="子命令")

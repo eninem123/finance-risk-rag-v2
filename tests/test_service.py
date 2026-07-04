@@ -16,12 +16,13 @@ class TestRiskAnalysisService(unittest.TestCase):
         self.mock_processor = MagicMock()
         self.mock_extractor = MagicMock()
         self.service = RiskAnalysisService(
-            config=self.mock_config, processor=self.mock_processor, extractor=self.mock_extractor
+            config=self.mock_config, processor=self.mock_processor, pipeline=self.mock_extractor
         )
 
     def test_run_full_analysis(self):
         # 准备 Mock 返回值
         mock_pdf = Path("test.pdf")
+        mock_pdf.touch()
         self.mock_processor.process_single_pdf.return_value = {
             "text": "sample text",
             "classification": {"type": "审计报告", "confidence": 0.9, "reason": "test"},
@@ -33,15 +34,22 @@ class TestRiskAnalysisService(unittest.TestCase):
             entities=mock_entities, total_risk_score=30, risk_level="低风险"
         )
 
-        # 执行
-        result = self.service.run_full_analysis(mock_pdf)
+        try:
+            # 执行
+            result = self.service.run_full_analysis(mock_pdf)
 
-        # 断言
-        self.assertEqual(result["document_info"]["name"], "test.pdf")
-        self.assertEqual(result["classification"]["type"], "审计报告")
-        self.assertEqual(result["risk_analysis"]["total_risk_score"], 30)
-        self.mock_processor.process_single_pdf.assert_called_once_with(mock_pdf)
-        self.mock_extractor.process.assert_called_once()
+            # 断言
+            self.assertEqual(result["status"], "success")
+            analysis = result["results"]
+            self.assertEqual(analysis["document_info"]["name"], "test.pdf")
+            self.assertEqual(analysis["classification"]["type"], "审计报告")
+            self.assertEqual(analysis["risk_analysis"]["total_risk_score"], 30)
+            self.mock_processor.process_single_pdf.assert_called_once_with(mock_pdf)
+            self.mock_extractor.process.assert_called_once()
+        finally:
+            # Cleanup
+            if mock_pdf.exists():
+                mock_pdf.unlink()
 
     def test_generate_report(self):
         # 准备数据
@@ -71,10 +79,10 @@ class TestRiskAnalysisService(unittest.TestCase):
         report = self.service.generate_report(analysis_data)
 
         # 断言
-        self.assertIn("# 财务风险分析报告: test.pdf", report)
+        self.assertIn("# 🏦 财务风险分析报告 (v2.3)", report)
         self.assertIn("中风险", report)
         self.assertIn("bad debt", report)
-        self.assertIn("💡 **建议**", report)
+        self.assertIn("🟡 **关注提示**", report)
 
 
 if __name__ == "__main__":

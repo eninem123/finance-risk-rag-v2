@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from .config import get_config
 from .exceptions import LLMError
+from .utils import PIIMasker
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,11 @@ class LLMClientWrapper:
         """
         if not self.is_available:
             raise LLMError("LLM client not initialized.")
+
+        # PII Masking (v2.3)
+        masker = PIIMasker()
+        for msg in messages:
+            msg["content"] = masker.mask(msg["content"])
 
         retries = 0
         while retries <= max_retries:
