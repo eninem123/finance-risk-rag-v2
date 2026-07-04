@@ -15,6 +15,31 @@ from .config import get_config
 PathLike = Union[str, Path]
 
 
+class PIIMasker:
+    """
+    财务敏感数据脱敏器 (v2.3)
+    支持：银行卡号、身份证号、邮箱、电话等。
+    """
+
+    def __init__(self):
+        self.patterns = {
+            "BANK_CARD": r"\b\d{16,19}\b",
+            "ID_CARD": r"\b\d{15,17}[\dX]\b",
+            "EMAIL": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+            "PHONE": r"\b1[3-9]\d{9}\b",
+        }
+
+    def mask(self, text: str) -> str:
+        if not text:
+            return ""
+
+        masked_text = text
+        for label, pattern in self.patterns.items():
+            masked_text = re.sub(pattern, f"[{label}_REDACTED]", masked_text)
+
+        return masked_text
+
+
 def ensure_dirs(*dirs: PathLike) -> None:
     for dir_path in dirs:
         path = Path(dir_path)

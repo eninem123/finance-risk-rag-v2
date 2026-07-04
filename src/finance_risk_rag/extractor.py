@@ -5,6 +5,7 @@ Finance-Risk-RAG 实体提取模块
 
 import logging
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Set, Tuple, Union
 
@@ -16,7 +17,31 @@ from .utils import calculate_risk_level, clean_text, load_json_file
 logger = logging.getLogger(__name__)
 
 
-class RuleBasedExtractor:
+class ScoringStrategy(ABC):
+    """评分策略抽象基类"""
+
+    @abstractmethod
+    def calculate_score(self, entity: Entity) -> int:
+        pass
+
+
+class FinanceRiskScoringStrategy(ScoringStrategy):
+    """财务风险评分策略"""
+
+    def calculate_score(self, entity: Entity) -> int:
+        # 基础分 * 置信度
+        return int(entity.risk_score * entity.confidence)
+
+
+class BaseExtractor(ABC):
+    """提取器抽象基类"""
+
+    @abstractmethod
+    def extract(self, text: str) -> List[Entity]:
+        pass
+
+
+class RuleBasedExtractor(BaseExtractor):
     """基于规则的实体提取器"""
 
     def __init__(self, config=None, rules_path: Optional[Path] = None):
@@ -46,8 +71,6 @@ class RuleBasedExtractor:
             base_risk_score = config.get("risk_score", 10)
 
             for keyword in keywords:
-                # Use regex for better matching, but avoid \b for CJK
-                # Basic implementation: find all occurrences
                 for match in re.finditer(re.escape(keyword), text, re.IGNORECASE):
                     start = match.start()
                     end = match.end()
@@ -75,7 +98,7 @@ class RuleBasedExtractor:
         return entities
 
 
-class BERTExtractor:
+class BERTExtractor(BaseExtractor):
     """基于 BERT 的实体提取器"""
 
     def __init__(self, model_path: Optional[Path] = None):
@@ -109,11 +132,12 @@ class BERTExtractor:
             logger.warning(f"Failed to load BERT model: {e}")
             self.model = None
 
+    @property
     def is_available(self) -> bool:
         return self.model is not None
 
     def extract(self, text: str) -> List[Entity]:
-        if not self.is_available() or not text:
+        if not self.is_available or not text:
             return []
 
         try:
@@ -141,10 +165,17 @@ class BERTExtractor:
 class EntityExtractionPipeline:
     """实体提取管道"""
 
-    def __init__(self, config=None, rule_extractor=None, bert_extractor=None):
+    def __init__(
+        self,
+        config=None,
+        rule_extractor=None,
+        bert_extractor=None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
         self.config = config or get_config()
         self.rule_extractor = rule_extractor or RuleBasedExtractor(config=self.config)
         self.bert_extractor = bert_extractor or BERTExtractor(self.config.bert_local_path)
+        self.scoring_strategy = scoring_strategy or FinanceRiskScoringStrategy()
 
     def process(self, text_or_path: Union[str, Path]) -> ExtractionResult:
         if isinstance(text_or_path, Path):
@@ -159,6 +190,10 @@ class EntityExtractionPipeline:
 
         # Advanced merging logic: Score-based arbitration and overlap resolution
         entities_list = self._merge_and_arbitrate(rule_entities, bert_entities)
+
+        # Apply scoring strategy
+        for entity in entities_list:
+            entity.risk_score = self.scoring_strategy.calculate_score(entity)
 
         total_risk = sum(e.risk_score for e in entities_list)
         risk_level = calculate_risk_level(total_risk)
