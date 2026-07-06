@@ -88,11 +88,8 @@ class BERTExtractor:
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import (
-                AutoModelForTokenClassification,
-                AutoTokenizer,
-                pipeline,
-            )
+            from transformers import (AutoModelForTokenClassification,
+                                      AutoTokenizer, pipeline)
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
@@ -172,14 +169,19 @@ class EntityExtractionPipeline:
     ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理重叠。
-        优先考虑高分和高置信度的实体。
+        仲裁逻辑：
+        1. 优先保留高置信度的 BERT 实体（置信度 > 0.85）。
+        2. 如果存在重叠，高分规则实体在 BERT 置信度较低时优先。
         """
         all_entities = rule_entities + bert_entities
         if not all_entities:
             return []
 
-        # 按得分和置信度排序
-        all_entities.sort(key=lambda x: (x.risk_score, x.confidence), reverse=True)
+        # 排序：高置信度 BERT 优先，然后按风险分数，最后按置信度
+        all_entities.sort(
+            key=lambda x: (x.source == "bert" and x.confidence > 0.85, x.risk_score, x.confidence),
+            reverse=True,
+        )
 
         final_entities: List[Entity] = []
 
@@ -191,6 +193,8 @@ class EntityExtractionPipeline:
                     current.end_char, existing.end_char
                 )
                 if overlap:
+                    # 如果当前是规则实体且已有重叠的高置信度 BERT，则舍弃规则实体
+                    # 反之，如果当前是低置信度 BERT 且已有重叠的高分规则，则舍弃 BERT
                     is_redundant = True
                     break
 
