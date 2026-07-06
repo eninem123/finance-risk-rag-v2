@@ -14,7 +14,8 @@ if str(src_path) not in sys.path:
 
 from src.finance_risk_rag.config import get_config  # noqa: E402
 from src.finance_risk_rag.service import RiskAnalysisService  # noqa: E402
-from src.finance_risk_rag.utils import save_json_file, setup_logger  # noqa: E402
+from src.finance_risk_rag.utils import (save_json_file,  # noqa: E402
+                                        setup_logger)
 
 
 def main():

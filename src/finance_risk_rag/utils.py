@@ -157,3 +157,33 @@ def calculate_risk_level(score: float) -> str:
         return "高风险"
     else:
         return "极高风险"
+
+
+class PIIMasker:
+    """敏感信息脱敏工具类"""
+
+    def __init__(self):
+        self.patterns = {
+            "email": re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"),
+            "id_card": re.compile(r"\b\d{15}(\d{2}[0-9xX])?\b"),
+            "bank_card": re.compile(r"\b\d{16,19}\b"),
+            "mobile": re.compile(r"\b1[3-9]\d{9}\b"),
+        }
+
+    def mask(self, text: str) -> str:
+        """对文本中的 PII 进行脱敏"""
+        if not text:
+            return text
+
+        masked_text = text
+        for pii_type, pattern in self.patterns.items():
+            if pii_type == "email":
+                masked_text = pattern.sub("[EMAIL]", masked_text)
+            elif pii_type == "id_card":
+                masked_text = pattern.sub("[ID_CARD]", masked_text)
+            elif pii_type == "bank_card":
+                masked_text = pattern.sub("[BANK_CARD]", masked_text)
+            elif pii_type == "mobile":
+                masked_text = pattern.sub("[MOBILE]", masked_text)
+
+        return masked_text

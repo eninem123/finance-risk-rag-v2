@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from .config import get_config
 from .exceptions import LLMError
+from .utils import PIIMasker
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class LLMClientWrapper:
         self.base_url = base_url or config.llm_base_url
         self.model_name = model_name or config.llm_model_name
         self._client = None
+        self._masker = PIIMasker()
 
         if not self.api_key:
             logger.warning("LLM API key not found.")
@@ -50,6 +52,7 @@ class LLMClientWrapper:
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.0,
+        mask_pii: bool = True,
         max_tokens: int = 1000,
         max_retries: int = 3,
         initial_backoff: float = 1.0,
@@ -59,6 +62,15 @@ class LLMClientWrapper:
         """
         if not self.is_available:
             raise LLMError("LLM client not initialized.")
+
+        # 脱敏处理
+        if mask_pii:
+            processed_messages = []
+            for msg in messages:
+                processed_messages.append(
+                    {"role": msg["role"], "content": self._masker.mask(msg["content"])}
+                )
+            messages = processed_messages
 
         retries = 0
         while retries <= max_retries:
