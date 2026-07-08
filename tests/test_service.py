@@ -21,7 +21,12 @@ class TestRiskAnalysisService(unittest.TestCase):
 
     def test_run_full_analysis(self):
         # 准备 Mock 返回值
-        mock_pdf = Path("test.pdf")
+        mock_pdf = MagicMock(spec=Path)
+        mock_pdf.is_file.return_value = True
+        mock_pdf.suffix = ".pdf"
+        mock_pdf.name = "test.pdf"
+        mock_pdf.with_suffix.return_value = Path("test.txt")
+
         self.mock_processor.process_single_pdf.return_value = {
             "text": "sample text",
             "classification": {"type": "审计报告", "confidence": 0.9, "reason": "test"},
@@ -49,6 +54,7 @@ class TestRiskAnalysisService(unittest.TestCase):
             "document_info": {
                 "name": "test.pdf",
                 "analyzed_at": "2024-01-01",
+                "hash": "abc123456789",
             },
             "classification": {"type": "审计报告", "confidence": 0.9, "reason": "test"},
             "risk_analysis": {
@@ -74,7 +80,7 @@ class TestRiskAnalysisService(unittest.TestCase):
         self.assertIn("# 财务风险分析报告: test.pdf", report)
         self.assertIn("中风险", report)
         self.assertIn("bad debt", report)
-        self.assertIn("💡 **建议**", report)
+        self.assertIn("🛡️ **风控建议**", report)
 
 
 if __name__ == "__main__":

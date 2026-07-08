@@ -5,6 +5,7 @@ Finance-Risk-RAG 实体提取模块
 
 import logging
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Set, Tuple, Union
 
@@ -16,16 +17,65 @@ from .utils import calculate_risk_level, clean_text, load_json_file
 logger = logging.getLogger(__name__)
 
 
-class RuleBasedExtractor:
+class ScoringStrategy(ABC):
+    """提取实体风险评分策略基类"""
+
+    @abstractmethod
+    def calculate_score(self, entity_type: str, confidence: float, **kwargs) -> int:
+        """计算实体的风险分值"""
+        pass
+
+
+class FinanceRiskScoringStrategy(ScoringStrategy):
+    """金融风险量化评分策略"""
+
+    def __init__(self, rules: Optional[dict] = None):
+        self.rules = rules or {}
+
+    def calculate_score(self, entity_type: str, confidence: float, **kwargs) -> int:
+        # 基础分数来自于规则配置，默认为 10
+        rule_config = self.rules.get(entity_type, {})
+        base_score = rule_config.get("risk_score", 20 if "bert" in kwargs.get("source", "") else 10)
+        # 根据置信度进行加权调整
+        return int(base_score * confidence)
+
+
+class BaseExtractor(ABC):
+    """实体提取器基类"""
+
+    @abstractmethod
+    def extract(self, text: str) -> List[Entity]:
+        """从文本中提取实体"""
+        pass
+
+    @property
+    @abstractmethod
+    def is_available(self) -> bool:
+        """检查提取器是否可用"""
+        pass
+
+
+class RuleBasedExtractor(BaseExtractor):
     """基于规则的实体提取器"""
 
-    def __init__(self, config=None, rules_path: Optional[Path] = None):
+    @property
+    def is_available(self) -> bool:
+        return bool(self.rules)
+
+    def __init__(
+        self,
+        config=None,
+        rules_path: Optional[Path] = None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
         self.config = config or get_config()
         self.rules = {}
         if rules_path:
             self.load_rules(rules_path)
         elif self.config.risk_entities_path.exists():
             self.load_rules(self.config.risk_entities_path)
+
+        self.scoring_strategy = scoring_strategy or FinanceRiskScoringStrategy(self.rules)
 
     def load_rules(self, rules_path: Path):
         try:
@@ -43,11 +93,8 @@ class RuleBasedExtractor:
 
         for entity_type, config in self.rules.items():
             keywords = config.get("keywords", [])
-            base_risk_score = config.get("risk_score", 10)
 
             for keyword in keywords:
-                # Use regex for better matching, but avoid \b for CJK
-                # Basic implementation: find all occurrences
                 for match in re.finditer(re.escape(keyword), text, re.IGNORECASE):
                     start = match.start()
                     end = match.end()
@@ -60,11 +107,15 @@ class RuleBasedExtractor:
                     context_end = min(len(text), end + 80)
                     context = text[context_start:context_end].replace("\n", " ").strip()
 
+                    risk_score = self.scoring_strategy.calculate_score(
+                        entity_type, 1.0, source="rule"
+                    )
+
                     entities.append(
                         Entity(
                             type=entity_type,
                             text=keyword,
-                            risk_score=base_risk_score,
+                            risk_score=risk_score,
                             confidence=1.0,
                             context=context,
                             source="rule",
@@ -75,24 +126,25 @@ class RuleBasedExtractor:
         return entities
 
 
-class BERTExtractor:
+class BERTExtractor(BaseExtractor):
     """基于 BERT 的实体提取器"""
 
-    def __init__(self, model_path: Optional[Path] = None):
+    def __init__(
+        self,
+        model_path: Optional[Path] = None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
         self.model = None
         self.tokenizer = None
         self.device = None
+        self.scoring_strategy = scoring_strategy or FinanceRiskScoringStrategy()
         if model_path and model_path.exists():
             self.load_model(model_path)
 
     def load_model(self, model_path: Path):
         try:
             import torch
-            from transformers import (
-                AutoModelForTokenClassification,
-                AutoTokenizer,
-                pipeline,
-            )
+            from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
             self.model = AutoModelForTokenClassification.from_pretrained(str(model_path))
@@ -109,33 +161,62 @@ class BERTExtractor:
             logger.warning(f"Failed to load BERT model: {e}")
             self.model = None
 
+    @property
     def is_available(self) -> bool:
         return self.model is not None
 
     def extract(self, text: str) -> List[Entity]:
-        if not self.is_available() or not text:
+        if not self.is_available or not text:
             return []
 
         try:
-            results = self.nlp(text)
-            entities = []
-            for res in results:
-                entities.append(
-                    Entity(
-                        type=res["entity_group"],
-                        text=res["word"],
-                        risk_score=20,  # Default risk score for BERT entities
-                        confidence=float(res["score"]),
-                        context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
-                        source="bert",
-                        start_char=res["start"],
-                        end_char=res["end"],
+            # 针对长文本使用滑动窗口切片
+            segments = self._chunk_text(text)
+            all_entities = []
+
+            for segment_text, offset in segments:
+                results = self.nlp(segment_text)
+                for res in results:
+                    confidence = float(res["score"])
+                    risk_score = self.scoring_strategy.calculate_score(
+                        res["entity_group"], confidence, source="bert"
                     )
-                )
-            return entities
+
+                    all_entities.append(
+                        Entity(
+                            type=res["entity_group"],
+                            text=res["word"],
+                            risk_score=risk_score,
+                            confidence=confidence,
+                            context=segment_text[
+                                max(0, res["start"] - 40) : min(len(segment_text), res["end"] + 40)
+                            ],
+                            source="bert",
+                            start_char=res["start"] + offset,
+                            end_char=res["end"] + offset,
+                        )
+                    )
+            return all_entities
         except Exception as e:
             logger.error(f"BERT extraction failed: {e}")
             return []
+
+    def _chunk_text(
+        self, text: str, max_length: int = 512, overlap: int = 50
+    ) -> List[Tuple[str, int]]:
+        """将长文本切分为带重叠的片段以适应 BERT 限制"""
+        if len(text) <= max_length:
+            return [(text, 0)]
+
+        chunks = []
+        start = 0
+        while start < len(text):
+            end = min(start + max_length, len(text))
+            chunks.append((text[start:end], start))
+            if end == len(text):
+                break
+            start += max_length - overlap
+        return chunks
 
 
 class EntityExtractionPipeline:
@@ -157,7 +238,7 @@ class EntityExtractionPipeline:
         rule_entities = self.rule_extractor.extract(text)
         bert_entities = self.bert_extractor.extract(text)
 
-        # Advanced merging logic: Score-based arbitration and overlap resolution
+        # 高级合并逻辑：基于评分的仲裁与重叠消除
         entities_list = self._merge_and_arbitrate(rule_entities, bert_entities)
 
         total_risk = sum(e.risk_score for e in entities_list)
@@ -172,21 +253,27 @@ class EntityExtractionPipeline:
     ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理重叠。
-        优先考虑高分和高置信度的实体。
+        优先规则：
+        1. 优先保留 BERT 置信度 > 0.85 的实体。
+        2. 在重叠情况下，保留风险评分较高的实体。
         """
         all_entities = rule_entities + bert_entities
         if not all_entities:
             return []
 
-        # 按得分和置信度排序
-        all_entities.sort(key=lambda x: (x.risk_score, x.confidence), reverse=True)
+        # 排序优先级：BERT 高置信度 (>0.85) > 风险评分 > 置信度
+        def sort_key(e: Entity):
+            is_high_conf_bert = 1 if (e.source == "bert" and e.confidence > 0.85) else 0
+            return (is_high_conf_bert, e.risk_score, e.confidence)
+
+        all_entities.sort(key=sort_key, reverse=True)
 
         final_entities: List[Entity] = []
 
         for current in all_entities:
             is_redundant = False
             for existing in final_entities:
-                # 使用字符偏移量进行精确的重叠检测
+                # 精确的重叠检测
                 overlap = max(current.start_char, existing.start_char) < min(
                     current.end_char, existing.end_char
                 )
@@ -197,4 +284,6 @@ class EntityExtractionPipeline:
             if not is_redundant:
                 final_entities.append(current)
 
+        # 最终按起始位置排序，方便展示
+        final_entities.sort(key=lambda x: x.start_char)
         return final_entities

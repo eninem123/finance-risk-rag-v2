@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from .config import get_config
 from .exceptions import LLMError
+from .utils import PIIMasker
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class LLMClientWrapper:
         self.base_url = base_url or config.llm_base_url
         self.model_name = model_name or config.llm_model_name
         self._client = None
+        self.pii_masker = PIIMasker()
 
         if not self.api_key:
             logger.warning("LLM API key not found.")
@@ -55,17 +57,24 @@ class LLMClientWrapper:
         initial_backoff: float = 1.0,
     ) -> str:
         """
-        发送聊天请求，带有指数退避重试机制。
+        发送聊天请求，带有指数退避重试机制，并自动进行 PII 脱敏。
         """
         if not self.is_available:
             raise LLMError("LLM client not initialized.")
+
+        # 调用 LLM 前进行脱敏
+        masked_messages = []
+        for msg in messages:
+            masked_messages.append(
+                {"role": msg["role"], "content": self.pii_masker.mask(msg["content"])}
+            )
 
         retries = 0
         while retries <= max_retries:
             try:
                 response = self._client.chat.completions.create(
                     model=self.model_name,
-                    messages=messages,
+                    messages=masked_messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
