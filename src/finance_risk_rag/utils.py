@@ -15,6 +15,27 @@ from .config import get_config
 PathLike = Union[str, Path]
 
 
+class PIIMasker:
+    """个人隐私信息 (PII) 掩码器，用于在调用外部 LLM 前脱敏"""
+
+    def __init__(self):
+        # 定义敏感信息正则
+        self.patterns = {
+            "email": r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",
+            "phone": r"1[3-9]\d{9}",
+            "id_card": r"\d{15}(\d{2}[0-9xX])?",
+            "bank_card": r"\d{16,19}",
+        }
+
+    def mask(self, text: str) -> str:
+        if not text:
+            return ""
+        masked_text = text
+        for label, pattern in self.patterns.items():
+            masked_text = re.sub(pattern, f"[MASKED_{label.upper()}]", masked_text)
+        return masked_text
+
+
 def ensure_dirs(*dirs: PathLike) -> None:
     for dir_path in dirs:
         path = Path(dir_path)
@@ -64,7 +85,8 @@ def split_text_by_sentence(text: str, max_len: int = 400, min_len: int = 50) -> 
         return []
 
     # 改进的句子分隔符，更好地处理中英文混排
-    sentence_seps = r"([。！？；.!?;])(?![0-9])"
+    # 增加对常见中英文标点的支持，并确保不拆分数字（如 3.14）
+    sentence_seps = r"(?<!\d)([。！？；.!?;])(?![0-9.])"
 
     # 使用捕获分组保留分隔符
     raw_parts = re.split(sentence_seps, text)
@@ -90,7 +112,7 @@ def split_text_by_sentence(text: str, max_len: int = 400, min_len: int = 50) -> 
         else:
             if current_chunk:
                 chunks.append(current_chunk)
-            # 如果单句就超过 max_len，强制截断（虽然罕见）
+            # 如果单句就超过 max_len，强制截断
             if len(sent) > max_len:
                 for i in range(0, len(sent), max_len):
                     chunks.append(sent[i : i + max_len])
@@ -99,7 +121,7 @@ def split_text_by_sentence(text: str, max_len: int = 400, min_len: int = 50) -> 
                 current_chunk = sent
 
     if current_chunk:
-        # 如果最后一个块太短，尝试合并到上一个块（如果可能）
+        # 如果最后一个块太短，尝试合并到上一个块
         if (
             chunks
             and len(current_chunk) < min_len
