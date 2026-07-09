@@ -1,4 +1,4 @@
-# Finance-Risk-RAG v2.2
+# Finance-Risk-RAG v2.3
 
 <div align="center">
 
@@ -6,9 +6,9 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-v2.2-blue?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-v2.3-blue?style=flat-square)]()
 
-OCR 智能识别 · BERT 实体提取 · RAG 风险问答 · Streamlit 可视化面板
+OCR 智能识别 · BERT 实体提取 · RAG 风险问答 · PI 脱敏安全 · 数据可视化
 
 </div>
 
@@ -18,19 +18,19 @@ OCR 智能识别 · BERT 实体提取 · RAG 风险问答 · Streamlit 可视化
 
 Finance-Risk-RAG 是一套**银行级财务文本风控 AI 系统**，整合 OCR、BERT 实体提取、规则引擎与 RAG 检索增强生成，支持批量 PDF 处理、风险实体识别与智能问答。
 
-> 本仓库为**个人闲置测试项目**，代码已收敛至 `main` 主线 v2.2 稳定版。
+> 本仓库为**个人闲置测试项目**，代码已收敛至 `main` 主线 v2.3 稳定版。
 
 ---
 
-## v2.2 核心能力
+## v2.3 核心能力
 
 | 模块 | 说明 |
 |------|------|
-| `RiskAnalysisService` | 业务编排层，协调 OCR → 分类 → 提取 → RAG |
-| `dashboard.py` | Streamlit 交互式面板（数据总览 / 文档分析 / 风险检索） |
-| `main.py report` | 生成 Markdown + JSON 综合风险报告 |
-| BERT 长文本切片 | 滑动窗口 Overlap Chunking，支持长文档 |
-| 精准偏移定位 | Entity 模型含 `start_char` / `end_char` |
+| `RiskAnalysisService` | **延迟加载优化**，支持生成“银行级”专业风险报告 |
+| `PIIMasker` | **安全增强**：自动脱敏身份证、银行卡等个人隐私信息 |
+| `ScoringStrategy` | **多因子风险评分**：基于置信度与权重的量化评估 |
+| `dashboard.py` | **可视化面板 v2.3**：集成 Plotly 风险矩阵与影响分分布图 |
+| BERT 滑动窗口 | 支持处理超长财务文本，确保实体提取不遗漏 |
 
 ---
 
@@ -61,7 +61,7 @@ python main.py dashboard
 ```
 finance-risk-rag-v2/
 ├── src/finance_risk_rag/
-│   ├── service.py          # 业务编排服务层 (v2.2)
+│   ├── service.py          # 业务编排服务层 (v2.3)
 │   ├── extractor.py        # 实体提取管道
 │   ├── processor.py        # 文档 OCR 处理
 │   ├── engine.py           # RAG 引擎

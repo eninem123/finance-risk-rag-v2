@@ -8,7 +8,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from .config import get_config
 
@@ -157,3 +157,27 @@ def calculate_risk_level(score: float) -> str:
         return "高风险"
     else:
         return "极高风险"
+
+
+class PIIMasker:
+    """个人身份信息（PII）脱敏工具类"""
+
+    def __init__(self):
+        # 常见 PII 正则表达式
+        self.patterns = {
+            "email": r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",
+            "phone": r"(?:\+86)?1[3-9]\d{9}",
+            "id_card": r"\d{15}(?:\d{2}[0-9Xx])?",
+            "bank_card": r"\d{16,19}",
+        }
+
+    def mask(self, text: str) -> str:
+        """对文本中的敏感信息进行脱敏"""
+        if not text:
+            return ""
+
+        masked_text = text
+        for pii_type, pattern in self.patterns.items():
+            masked_text = re.sub(pattern, f"<{pii_type.upper()}>", masked_text)
+
+        return masked_text

@@ -32,14 +32,35 @@ class RiskAnalysisService:
         extractor: Optional[EntityExtractionPipeline] = None,
     ):
         self.config = config or get_config()
-        self.processor = processor or DocumentProcessor(self.config)
-        self.pipeline = pipeline or extractor or EntityExtractionPipeline(self.config)
-        self.engine = engine or RAGEngine(self.config)
+        self._processor = processor
+        self._pipeline = pipeline or extractor
+        self._engine = engine
+
+    @property
+    def processor(self) -> DocumentProcessor:
+        """延迟加载文档处理器"""
+        if self._processor is None:
+            self._processor = DocumentProcessor(self.config)
+        return self._processor
+
+    @property
+    def pipeline(self) -> EntityExtractionPipeline:
+        """延迟加载提取管道"""
+        if self._pipeline is None:
+            self._pipeline = EntityExtractionPipeline(self.config)
+        return self._pipeline
 
     @property
     def extractor(self) -> EntityExtractionPipeline:
         """兼容旧版 API"""
         return self.pipeline
+
+    @property
+    def engine(self) -> RAGEngine:
+        """延迟加载 RAG 引擎"""
+        if self._engine is None:
+            self._engine = RAGEngine(self.config)
+        return self._engine
 
     def analyze_document(self, pdf_path: Path) -> Dict[str, Any]:
         """执行单文档完整分析：OCR -> 分类 -> 实体提取"""
@@ -98,40 +119,50 @@ class RiskAnalysisService:
         classification = analysis_data["classification"]
         risk = analysis_data["risk_analysis"]
 
-        report = f"""# 财务风险分析报告: {doc_info['name']}
+        # 生成执行摘要
+        summary = self._generate_executive_summary(risk)
 
-## 1. 基本信息
+        report = f"""# 银行级财务风险分析报告 v2.3
+
+## 1. 执行摘要
+{summary}
+
+## 2. 基本信息
+- **文档名称**: {doc_info['name']}
 - **分析时间**: {doc_info['analyzed_at']}
 - **文档类型**: {classification.get('type', '未知')} (置信度: {classification.get('confidence', 0.0):.2f})
 - **分类依据**: {classification.get('reason', '无')}
 
-## 2. 风险评估摘要
-- **风险等级**: **{risk['risk_level']}**
-- **量化评分**: {risk['total_risk_score']}
-- **识别实体总数**: {risk['total_entities']}
+## 3. 风险评估矩阵
+- **风险评级**: **{risk['risk_level']}**
+- **量化总分**: {risk['total_risk_score']}
+- **实体统计**: 共识别出 {risk['total_entities']} 个风险点
 
-## 3. 详细风险实体
-| 类型 | 实体文本 | 风险分数 | 置信度 | 来源 |
+### 风险类型分布
+"""
+        # 统计实体类型
+        type_counts: Dict[str, int] = {}
+        for entity in risk["entities"]:
+            t = entity["type"]
+            type_counts[t] = type_counts.get(t, 0) + 1
+
+        report += "| 风险类型 | 出现频率 |\n| :--- | :--- |\n"
+        for t, count in type_counts.items():
+            report += f"| {t} | {count} |\n"
+
+        report += """
+## 4. 核心风险清单
+| 风险实体 | 类别 | 风险权重 | 影响分 | 来源 |
 | :--- | :--- | :--- | :--- | :--- |
 """
         for entity in risk["entities"]:
             report += (
-                f"| {entity['type']} | {entity['text']} | {entity['risk_score']} | "
-                f"{entity['confidence']:.2f} | {entity['source']} |\n"
+                f"| {entity['text']} | {entity['type']} | {entity['risk_score']} | "
+                f"{entity.get('impact_score', 0.0):.2f} | {entity['source']} |\n"
             )
 
-        report += "\n## 4. 结论与建议\n"
-        if risk["risk_level"] in ["高风险", "极高风险"]:
-            report += (
-                "⚠️ **建议**: 该文档包含多项高风险因素，建议进行人工深度审计和加强现场尽调。\n"
-            )
-        elif risk["risk_level"] == "中风险":
-            report += (
-                "💡 **建议**: 存在一定风险点，建议关注相关实体的背景情况，"
-                "必要时要求补充资料。\n"
-            )
-        else:
-            report += "✅ **建议**: 风险较低，可按正常流程处理。\n"
+        report += "\n## 5. 风控建议与措施\n"
+        report += self._get_structured_suggestions(risk)
 
         if output_path:
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -140,6 +171,42 @@ class RiskAnalysisService:
             save_json_file(analysis_data, output_path.with_suffix(".json"))
 
         return report
+
+    def _generate_executive_summary(self, risk: Dict[str, Any]) -> str:
+        """生成自动化的执行摘要"""
+        if risk["total_entities"] == 0:
+            return "本报告未在提交的文档中发现显著的已知财务风险点。建议按常规流程处理。"
+
+        top_entities = sorted(risk["entities"], key=lambda x: x.get("impact_score", 0), reverse=True)
+        main_risk = top_entities[0]["text"] if top_entities else "多项财务指标"
+
+        return (
+            f"本报告通过自动化的多模态风控系统识别出该文档存在 {risk['risk_level']}。 "
+            f"主要风险点聚焦于“{main_risk}”等。 综合量化评分为 {risk['total_risk_score']}，"
+            f"建议管理层根据本报告第 5 节的建议采取相应风控措施。"
+        )
+
+    def _get_structured_suggestions(self, risk: Dict[str, Any]) -> str:
+        """获取结构化的风控建议"""
+        level = risk["risk_level"]
+        if level in ["高风险", "极高风险"]:
+            return """
+- [ ] **深度尽调**: 立即启动二级财务尽职调查，核实重点科目。
+- [ ] **限制授信**: 在风险未排除前，建议冻结或限制该关联主体的授信额度。
+- [ ] **现场核查**: 指派审计团队进行现场实地核查和访谈。
+- [ ] **高层介入**: 风险等级已达预警线，需呈报风控委员会审议。
+"""
+        elif level == "中风险":
+            return """
+- [ ] **持续监控**: 将该实体列入观察名单，按季度监控其公开财务变动。
+- [ ] **补充资料**: 要求客户提供关联交易详情或抵押物评估更新。
+- [ ] **电话访谈**: 针对特定风险点（如现金流波动）进行专项电话问询。
+"""
+        else:
+            return """
+- [x] **常规监测**: 纳入年度常规复核计划。
+- [x] **合规备案**: 分析结果已存入信贷管理系统备案。
+"""
 
     def process_batch(self, directory: Path) -> List[Dict[str, Any]]:
         """批量处理目录下的所有 PDF"""

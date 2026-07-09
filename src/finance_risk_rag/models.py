@@ -22,6 +22,8 @@ class Entity:
     source: str = "rule"
     start_char: int = 0
     end_char: int = 0
+    risk_category: str = "常规"
+    impact_score: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -35,6 +37,8 @@ class Entity:
             "source": self.source,
             "start_char": self.start_char,
             "end_char": self.end_char,
+            "risk_category": self.risk_category,
+            "impact_score": round(self.impact_score, 2),
             **self.metadata,
         }
 
