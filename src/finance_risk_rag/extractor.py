@@ -5,6 +5,7 @@ Finance-Risk-RAG 实体提取模块
 
 import logging
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Set, Tuple, Union
 
@@ -14,6 +15,29 @@ from .models import Entity, ExtractionResult
 from .utils import calculate_risk_level, clean_text, load_json_file
 
 logger = logging.getLogger(__name__)
+
+
+class ScoringStrategy(ABC):
+    """风险评分策略基类"""
+
+    @abstractmethod
+    def calculate(self, entity: Entity) -> float:
+        """计算实体的最终影响分数"""
+        pass
+
+
+class FinanceRiskScoringStrategy(ScoringStrategy):
+    """金融风险评分策略（基于置信度和实体权重）"""
+
+    def calculate(self, entity: Entity) -> float:
+        # 基础评分 * 置信度
+        impact = entity.risk_score * entity.confidence
+
+        # 根据来源调整
+        if entity.source == "bert":
+            impact *= 1.2  # BERT 提取的实体通常具有更高的上下文相关性
+
+        return round(impact, 2)
 
 
 class RuleBasedExtractor:
@@ -113,38 +137,83 @@ class BERTExtractor:
         return self.model is not None
 
     def extract(self, text: str) -> List[Entity]:
+        """
+        使用 BERT 提取实体，支持长文本切片。
+        """
         if not self.is_available() or not text:
             return []
 
+        # BERT 通常限制 512 tokens，我们采用滑动窗口处理
+        max_length = 500
+        overlap = 50
+        entities = []
+
         try:
-            results = self.nlp(text)
-            entities = []
-            for res in results:
-                entities.append(
-                    Entity(
-                        type=res["entity_group"],
-                        text=res["word"],
-                        risk_score=20,  # Default risk score for BERT entities
-                        confidence=float(res["score"]),
-                        context=text[max(0, res["start"] - 40) : min(len(text), res["end"] + 40)],
-                        source="bert",
-                        start_char=res["start"],
-                        end_char=res["end"],
+            chunks = self._chunk_text(text, max_length, overlap)
+            for chunk_text, offset in chunks:
+                results = self.nlp(chunk_text)
+                for res in results:
+                    start = res["start"] + offset
+                    end = res["end"] + offset
+                    entities.append(
+                        Entity(
+                            type=res["entity_group"],
+                            text=res["word"],
+                            risk_score=20,
+                            confidence=float(res["score"]),
+                            context=text[max(0, start - 40) : min(len(text), end + 40)],
+                            source="bert",
+                            start_char=start,
+                            end_char=end,
+                        )
                     )
-                )
-            return entities
+            return self._deduplicate_entities(entities)
         except Exception as e:
             logger.error(f"BERT extraction failed: {e}")
             return []
+
+    def _chunk_text(self, text: str, max_length: int, overlap: int) -> List[Tuple[str, int]]:
+        chunks = []
+        if len(text) <= max_length:
+            return [(text, 0)]
+
+        start = 0
+        while start < len(text):
+            end = min(start + max_length, len(text))
+            chunks.append((text[start:end], start))
+            if end == len(text):
+                break
+            start += max_length - overlap
+        return chunks
+
+    def _deduplicate_entities(self, entities: List[Entity]) -> List[Entity]:
+        if not entities:
+            return []
+        # 按位置和文本去重
+        seen = set()
+        unique_entities = []
+        for e in entities:
+            key = (e.type, e.text, e.start_char)
+            if key not in seen:
+                unique_entities.append(e)
+                seen.add(key)
+        return unique_entities
 
 
 class EntityExtractionPipeline:
     """实体提取管道"""
 
-    def __init__(self, config=None, rule_extractor=None, bert_extractor=None):
+    def __init__(
+        self,
+        config=None,
+        rule_extractor=None,
+        bert_extractor=None,
+        scoring_strategy: Optional[ScoringStrategy] = None,
+    ):
         self.config = config or get_config()
         self.rule_extractor = rule_extractor or RuleBasedExtractor(config=self.config)
         self.bert_extractor = bert_extractor or BERTExtractor(self.config.bert_local_path)
+        self.scoring_strategy = scoring_strategy or FinanceRiskScoringStrategy()
 
     def process(self, text_or_path: Union[str, Path]) -> ExtractionResult:
         if isinstance(text_or_path, Path):
@@ -160,6 +229,10 @@ class EntityExtractionPipeline:
         # Advanced merging logic: Score-based arbitration and overlap resolution
         entities_list = self._merge_and_arbitrate(rule_entities, bert_entities)
 
+        # 计算最终影响分数
+        for entity in entities_list:
+            entity.impact_score = self.scoring_strategy.calculate(entity)
+
         total_risk = sum(e.risk_score for e in entities_list)
         risk_level = calculate_risk_level(total_risk)
 
@@ -172,28 +245,42 @@ class EntityExtractionPipeline:
     ) -> List[Entity]:
         """
         合并规则引擎和 BERT 的结果，处理重叠。
-        优先考虑高分和高置信度的实体。
+        仲裁机制：
+        1. 如果 BERT 实体的置信度 > 0.85，在发生冲突时优先保留 BERT 结果。
+        2. 否则，保留得分和置信度更高的实体。
         """
-        all_entities = rule_entities + bert_entities
-        if not all_entities:
+        if not rule_entities and not bert_entities:
             return []
 
-        # 按得分和置信度排序
-        all_entities.sort(key=lambda x: (x.risk_score, x.confidence), reverse=True)
+        # 分离出高置信度的 BERT 实体
+        high_conf_bert = [e for e in bert_entities if e.confidence > 0.85]
+        other_entities = rule_entities + [e for e in bert_entities if e.confidence <= 0.85]
 
+        # 先处理高置信度 BERT
+        high_conf_bert.sort(key=lambda x: x.confidence, reverse=True)
         final_entities: List[Entity] = []
 
-        for current in all_entities:
+        for current in high_conf_bert:
+            overlap = False
+            for existing in final_entities:
+                if max(current.start_char, existing.start_char) < min(
+                    current.end_char, existing.end_char
+                ):
+                    overlap = True
+                    break
+            if not overlap:
+                final_entities.append(current)
+
+        # 再合并其他实体
+        other_entities.sort(key=lambda x: (x.risk_score, x.confidence), reverse=True)
+        for current in other_entities:
             is_redundant = False
             for existing in final_entities:
-                # 使用字符偏移量进行精确的重叠检测
-                overlap = max(current.start_char, existing.start_char) < min(
+                if max(current.start_char, existing.start_char) < min(
                     current.end_char, existing.end_char
-                )
-                if overlap:
+                ):
                     is_redundant = True
                     break
-
             if not is_redundant:
                 final_entities.append(current)
 

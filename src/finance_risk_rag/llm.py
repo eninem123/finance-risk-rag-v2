@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from .config import get_config
 from .exceptions import LLMError
+from .utils import PIIMasker
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class LLMClientWrapper:
         self.base_url = base_url or config.llm_base_url
         self.model_name = model_name or config.llm_model_name
         self._client = None
+        self.masker = PIIMasker()
 
         if not self.api_key:
             logger.warning("LLM API key not found.")
@@ -63,9 +65,14 @@ class LLMClientWrapper:
         retries = 0
         while retries <= max_retries:
             try:
+                # 在发送前对消息进行脱敏
+                masked_messages = [
+                    {"role": m["role"], "content": self.masker.mask(m["content"])} for m in messages
+                ]
+
                 response = self._client.chat.completions.create(
                     model=self.model_name,
-                    messages=messages,
+                    messages=masked_messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
@@ -73,8 +80,9 @@ class LLMClientWrapper:
             except Exception as e:
                 retries += 1
                 if retries > max_retries:
-                    logger.error(f"LLM call failed after {max_retries} retries: {e}")
-                    raise LLMError(f"LLM call failed after {max_retries} retries: {e}")
+                    err_msg = f"LLM call failed after {max_retries} retries: {e}"
+                    logger.error(err_msg)
+                    raise LLMError(err_msg)
 
                 wait_time = initial_backoff * (2 ** (retries - 1))
                 logger.warning(
